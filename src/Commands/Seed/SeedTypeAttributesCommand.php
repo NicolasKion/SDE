@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Exception;
@@ -7,6 +9,14 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * @phpstan-type DogmaAttributesFile array<int,array{
+ *     dogmaAttributes: array<int, array{
+ *         attributeID: int,
+ *         value: float,
+ *     }>
+ * }>
+ */
 class SeedTypeAttributesCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:type-attributes';
@@ -20,7 +30,7 @@ class SeedTypeAttributesCommand extends BaseSeedCommand
 
         $file = 'sde/fsd/typeDogma.yaml';
 
-        /** @var array $data */
+        /** @var DogmaAttributesFile $data */
         $data = Yaml::parseFile(Storage::path($file));
 
         $typeAttribute = ClassResolver::typeAttribute();

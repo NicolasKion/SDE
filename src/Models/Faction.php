@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -23,16 +25,25 @@ class Faction extends Model
         'is_unique',
     ];
 
+    /**
+     * @return BelongsTo<Corporation,$this>
+     */
     public function militiaCorporation(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::corporation());
     }
 
+    /**
+     * @return BelongsTo<Corporation,$this>
+     */
     public function corporation(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::corporation());
     }
 
+    /**
+     * @return HasMany<Corporation,$this>
+     */
     public function corporations(): HasMany
     {
         return $this->hasMany(ClassResolver::corporation());

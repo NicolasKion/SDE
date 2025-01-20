@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -24,16 +26,25 @@ class Attribute extends Model
         'stackable',
     ];
 
+    /**
+     * @return HasMany<TypeAttribute,$this>
+     */
     public function typeAttributes(): HasMany
     {
         return $this->hasMany(ClassResolver::typeAttribute(), 'attribute_id');
     }
 
+    /**
+     * @return BelongsTo<Unit,$this>
+     */
     public function unit(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::unit());
     }
 
+    /**
+     * @return BelongsTo<Icon,$this>
+     */
     public function icon(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::icon());

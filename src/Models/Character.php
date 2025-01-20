@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -38,26 +40,41 @@ class Character extends Model
         ), 5);
     }
 
+    /**
+     * @return BelongsTo<Race,$this>
+     */
     public function race(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::race());
     }
 
+    /**
+     * @return BelongsTo<Bloodline,$this>
+     */
     public function bloodline(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::bloodline());
     }
 
+    /**
+     * @return BelongsTo<Corporation,$this>
+     */
     public function corporation(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::corporation());
     }
 
+    /**
+     * @return BelongsTo<Faction,$this>
+     */
     public function faction(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::faction());
     }
 
+    /**
+     * @return BelongsTo<Alliance,$this>
+     */
     public function alliance(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::alliance());

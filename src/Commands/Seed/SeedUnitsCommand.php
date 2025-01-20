@@ -1,11 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use NicolasKion\SDE\ClassResolver;
 
+/**
+ * @phpstan-type UnitsResponse array<int, array{
+ *     displayName: string|null,
+ *     description: string|null,
+ *     name: string|null
+ * }>
+ */
 class SeedUnitsCommand extends Command
 {
     protected const UNITS_URL = 'https://sde.hoboleaks.space/tq/dogmaunits.json';
@@ -15,7 +24,7 @@ class SeedUnitsCommand extends Command
     {
         $response = Http::get(self::UNITS_URL);
 
-        /** @var array<int, array{displayName: string|null, description: string|null, name: string|null}> $data */
+        /** @var UnitsResponse $data */
         $data = $response->json();
 
         $unit = ClassResolver::unit();

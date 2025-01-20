@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Exception;
@@ -7,6 +9,24 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * @phpstan-type TypesFile array<int, array{
+ *     name: array{en: string|null},
+ *     description: array{en: string|null},
+ *     groupID: int,
+ *     marketGroupID: int|null,
+ *     published: boolean|null,
+ *     mass: float|null,
+ *     volume: float|null,
+ *     capacity: float|null,
+ *     portionSize: float|null,
+ *     basePrice: float|null,
+ *     radius: float|null,
+ *     iconID: int|null,
+ *     graphicID: int|null,
+ *     metaGroupID: int|null,
+ * }>
+ */
 class SeedTypesCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:types';
@@ -20,7 +40,7 @@ class SeedTypesCommand extends BaseSeedCommand
 
         $file = 'sde/fsd/types.yaml';
 
-        /** @var array $data */
+        /** @var TypesFile $data */
         $data = Yaml::parseFile(Storage::path($file));
 
         $type = ClassResolver::type();

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -19,11 +21,17 @@ class MetaGroup extends Model
         'icon_suffix',
     ];
 
+    /**
+     * @return HasMany<Type,$this>
+     */
     public function types(): HasMany
     {
         return $this->hasMany(ClassResolver::type(), 'meta_group_id');
     }
 
+    /**
+     * @return BelongsTo<Icon,$this>
+     */
     public function icon(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::icon());

@@ -1,13 +1,58 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * @phpstan-type FactionsResponse array<int, array{
+ *     faction_id: int,
+ *     name: string,
+ *     description: null|string,
+ *     is_unique: boolean,
+ *     corporation_id: int|null,
+ *     militia_corporation_id: int|null,
+ *     size_factor: float,
+ *     solar_system_id: int,
+ *     station_count: int,
+ *     station_system_count: int,
+ * }>
+ *
+ * @phpstan-type CorporationsFile array<int, array{
+ *     stationID: int|null,
+ *     ceoID: int|null,
+ *     creatorID: int|null,
+ *     factionID: int|null,
+ *     dateFounded: string|null,
+ *     url: string|null,
+ *     nameID: array{en: string|null},
+ *     descriptionID: array{en: string|null},
+ *     members: int|null,
+ *     shares: int,
+ *     taxRate: float,
+ * }>
+ *
+ * @phpstan-type BloodlinesResponse array<int,array{
+ *     bloodline_id: int,
+ *     name: string,
+ *     description: string|null,
+ *     corporation_id: int,
+ *     ship_type_id: int,
+ *     race_id: int,
+ *     intelligence: int,
+ *     charisma: int,
+ *     perception: int,
+ *     memory: int,
+ *     willpower: int,
+ * }>
+ */
 class SeedSocialsCommand extends Command
 {
     protected $signature = 'sde:seed:socials';
@@ -23,8 +68,12 @@ class SeedSocialsCommand extends Command
         return self::SUCCESS;
     }
 
-    private function seedFactions()
+    /**
+     * @throws ConnectionException
+     */
+    private function seedFactions(): void
     {
+        /** @var FactionsResponse $factionEsi */
         $factionEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/factions/')->json();
 
         $faction = ClassResolver::faction();
@@ -44,14 +93,16 @@ class SeedSocialsCommand extends Command
         }
     }
 
-    private function seedCorps()
+    private function seedCorps(): void
     {
         $file_name = 'sde/fsd/npcCorporations.yaml';
 
+        /** @var CorporationsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $corp = ClassResolver::corporation();
 
+        /** @var int[] $char_ids */
         $char_ids = collect($data)->values()->pluck('ceoID')->unique()->whereNotNull()->all();
 
         $char = ClassResolver::character();
@@ -61,7 +112,7 @@ class SeedSocialsCommand extends Command
         $char::createFromIds($char_ids);
 
         foreach ($data as $id => $values) {
-            $stationData = $station::find($values['stationID'] ?? null);
+            $stationData = $station::query()->find($values['stationID'] ?? null);
             $corp::query()->updateOrInsert(['id' => $id], [
                 'ceo_id' => $values['ceoID'] ?? null,
                 'creator_id' => null,
@@ -80,13 +131,17 @@ class SeedSocialsCommand extends Command
         }
     }
 
-    private function seedBloodlines()
+    /**
+     * @throws ConnectionException
+     */
+    private function seedBloodlines(): void
     {
-        $factionEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/bloodlines/')->json();
+        /** @var BloodlinesResponse $bloodlinesEsi */
+        $bloodlinesEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/bloodlines/')->json();
 
         $bloodline = ClassResolver::bloodline();
 
-        foreach ($factionEsi as $values) {
+        foreach ($bloodlinesEsi as $values) {
             $bloodline::query()->updateOrInsert(['id' => $values['bloodline_id']], [
                 'name' => $values['name'],
                 'description' => $values['description'] ?? null,

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Console\Command;
@@ -7,6 +9,13 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * @phpstan-type RacesFile array<int,array{
+ *     nameID: array{en:string|null},
+ *     descriptionID: array{en: string|null},
+ *     iconID: int|null
+ * }>
+ */
 class SeedRacesCommand extends Command
 {
     protected $signature = 'sde:seed:races';
@@ -15,6 +24,7 @@ class SeedRacesCommand extends Command
     {
         $file_name = 'sde/fsd/races.yaml';
 
+        /** @var RacesFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $race = ClassResolver::race();

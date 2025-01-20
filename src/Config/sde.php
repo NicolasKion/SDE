@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use NicolasKion\SDE\Models\Alliance;
 use NicolasKion\SDE\Models\Attribute;
 use NicolasKion\SDE\Models\Bloodline;

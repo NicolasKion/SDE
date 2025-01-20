@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -23,16 +25,25 @@ class Group extends Model
         'fittable_non_singleton',
     ];
 
+    /**
+     * @return BelongsTo<Icon,$this>
+     */
     public function icon(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::icon());
     }
 
+    /**
+     * @return BelongsTo<Category,$this>
+     */
     public function category(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::category());
     }
 
+    /**
+     * @return HasMany<Type,$this>
+     */
     public function types(): HasMany
     {
         return $this->hasMany(ClassResolver::type(), 'group_id');

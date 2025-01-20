@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -18,11 +20,17 @@ class Race extends Model
         'icon_id',
     ];
 
+    /**
+     * @return HasMany<Type,$this>
+     */
     public function types(): HasMany
     {
         return $this->hasMany(ClassResolver::type(), 'race_id');
     }
 
+    /**
+     * @return HasMany<Character,$this>
+     */
     public function characters(): HasMany
     {
         return $this->hasMany(ClassResolver::character(), 'race_id');

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Console\Command;
@@ -8,6 +10,14 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * @phpstan-type MetaGroupsFile array<int, array{
+ *     nameID: array{en:string|null},
+ *     iconID: int|null,
+ *     iconSuffix: string|null,
+ *     descriptionID: array{en:string|null},
+ * }>
+ */
 class SeedMetaGroupsCommand extends Command
 {
     protected $signature = 'sde:seed:meta-groups';
@@ -16,6 +26,7 @@ class SeedMetaGroupsCommand extends Command
     {
         $file_name = 'sde/fsd/metaGroups.yaml';
 
+        /** @var MetaGroupsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $metaGroup = ClassResolver::metaGroup();

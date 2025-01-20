@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands;
 
 use Illuminate\Console\Command;
@@ -16,7 +18,7 @@ class DownloadSDECommand extends Command
 
         if ($response->failed()) {
             $this->error('Failed to download SDE!');
-            $this->error($response->getBody());
+            $this->error($response->body());
             return self::FAILURE;
         }
 

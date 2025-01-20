@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +19,9 @@ class Category extends Model
         'published',
     ];
 
+    /**
+     * @return HasMany<Group,$this>
+     */
     public function groups(): HasMany
     {
         return $this->hasMany(ClassResolver::group(), 'category_id');

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -18,21 +20,33 @@ class Constellation extends Model
         'type',
     ];
 
+    /**
+     * @return BelongsTo<Region,$this>
+     */
     public function region(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::region());
     }
 
+    /**
+     * @return HasMany<Solarsystem,$this>
+     */
     public function solarsystems(): HasMany
     {
         return $this->hasMany(ClassResolver::solarsystem(), 'constellation_id');
     }
 
+    /**
+     * @return HasMany<Station,$this>
+     */
     public function stations(): HasMany
     {
         return $this->hasMany(ClassResolver::station(), 'constellation_id');
     }
 
+    /**
+     * @return HasMany<Celestial,$this>
+     */
     public function celestials(): HasMany
     {
         return $this->hasMany(ClassResolver::celestial(), 'constellation_id');

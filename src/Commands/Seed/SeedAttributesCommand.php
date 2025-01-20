@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Console\Command;
@@ -7,6 +9,20 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+
+/**
+ * @phpstan-type DogmaAttributeFile array<int,array{
+ *     highIsGood: null|boolean,
+ *     displayNameID: array{en: string|null},
+ *     defaultValue: null|int,
+ *     iconID: int|null,
+ *     published: bool|null,
+ *     name: string|null,
+ *     description: string|null,
+ *     stackable: boolean|null,
+ *     unitID: int|null,
+ * }>
+ */
 class SeedAttributesCommand extends Command
 {
     protected $signature = 'sde:seed:attributes';
@@ -18,17 +34,18 @@ class SeedAttributesCommand extends Command
     {
         $file_name = 'sde/fsd/dogmaAttributes.yaml';
 
+        /** @var  DogmaAttributeFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $attribute_class = ClassResolver::attribute();
-
+        
         foreach ($data as $id => $values) {
             $attribute_class::query()->updateOrCreate(
                 ['id' => $id],
                 [
                     'id' => $id,
                     'high_is_good' => $values['highIsGood'] ?? false,
-                    'description' => $locals[$id]['description'] ?? '',
+                    'description' => $values['description'] ?? '',
                     'default_value' => $values['defaultValue'] ?? 0,
                     'icon_id' => $values['iconID'] ?? null,
                     'published' => $values['published'] ?? false,

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +21,9 @@ class Graphic extends Model
         'description',
     ];
 
+    /**
+     * @return HasMany<Type,$this>
+     */
     public function types(): HasMany
     {
         return $this->hasMany(ClassResolver::type(), 'graphic_id');

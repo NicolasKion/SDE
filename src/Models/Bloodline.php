@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -23,16 +25,25 @@ class Bloodline extends Model
         'memory',
     ];
 
+    /**
+     * @return BelongsTo<Race,$this>
+     */
     public function race(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::race());
     }
 
+    /**
+     * @return BelongsTo<Type,$this>
+     */
     public function shipType(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::type());
     }
 
+    /**
+     * @return HasMany<Character,$this>
+     */
     public function characters(): HasMany
     {
         return $this->hasMany(ClassResolver::character(), 'bloodline_id');

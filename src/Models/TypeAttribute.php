@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -15,11 +17,17 @@ class TypeAttribute extends Model
         'value',
     ];
 
+    /**
+     * @return BelongsTo<Type,$this>
+     */
     public function type(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::type());
     }
 
+    /**
+     * @return BelongsTo<Attribute,$this>
+     */
     public function attribute(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::attribute());

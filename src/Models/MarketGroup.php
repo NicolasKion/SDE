@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -20,16 +22,25 @@ class MarketGroup extends Model
         'parent_id',
     ];
 
+    /**
+     * @return HasMany<Type,$this>
+     */
     public function types(): HasMany
     {
         return $this->hasMany(ClassResolver::type(), 'market_group_id');
     }
 
+    /**
+     * @return BelongsTo<Icon,$this>
+     */
     public function icon(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::icon());
     }
 
+    /**
+     * @return BelongsTo<MarketGroup,$this>
+     */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::marketGroup());

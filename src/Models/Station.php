@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -21,31 +23,49 @@ class Station extends Model
         'group_id',
     ];
 
+    /**
+     * @return BelongsTo<Solarsystem,$this>
+     */
     public function solarsystem(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::solarsystem());
     }
 
+    /**
+     * @return BelongsTo<Constellation,$this>
+     */
     public function constellation(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::constellation());
     }
 
+    /**
+     * @return BelongsTo<Celestial,$this>
+     */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::celestial());
     }
 
+    /**
+     * @return BelongsTo<Type,$this>
+     */
     public function type(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::type());
     }
 
+    /**
+     * @return BelongsTo<Group,$this>
+     */
     public function group(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::group());
     }
 
+    /**
+     * @return BelongsTo<Region,$this>
+     */
     public function region(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::region());

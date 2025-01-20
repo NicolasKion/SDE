@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +19,9 @@ class Unit extends Model
         'description',
     ];
 
+    /**
+     * @return HasMany<Attribute, $this>
+     */
     public function attributes(): HasMany
     {
         return $this->hasMany(ClassResolver::attribute(), 'unit_id');

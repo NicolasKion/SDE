@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -16,21 +18,33 @@ class Icon extends Model
         'description',
     ];
 
+    /**
+     * @return HasMany<Type,$this>
+     */
     public function types(): HasMany
     {
         return $this->hasMany(ClassResolver::type(), 'icon_id');
     }
 
+    /**
+     * @return HasMany<Attribute,$this>
+     */
     public function attributes(): HasMany
     {
         return $this->hasMany(ClassResolver::attribute(), 'icon_id');
     }
 
+    /**
+     * @return HasMany<MarketGroup,$this>
+     */
     public function marketGroups(): HasMany
     {
         return $this->hasMany(ClassResolver::marketGroup(), 'icon_id');
     }
 
+    /**
+     * @return HasMany<MetaGroup,$this>
+     */
     public function metaGroups(): HasMany
     {
         return $this->hasMany(ClassResolver::metaGroup(), 'icon_id');

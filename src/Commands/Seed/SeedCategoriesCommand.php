@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Console\Command;
@@ -7,6 +9,12 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * @phpstan-type CategoryFile array<int, array{
+ *     name: array{en:string|null},
+ *     published: boolean|null,
+ * }>
+ */
 class SeedCategoriesCommand extends Command
 {
     protected $signature = 'sde:seed:categories';
@@ -15,6 +23,7 @@ class SeedCategoriesCommand extends Command
     {
         $file_name = 'sde/fsd/categories.yaml';
 
+        /** @var CategoryFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $category = ClassResolver::category();
