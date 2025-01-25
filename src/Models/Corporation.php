@@ -24,6 +24,7 @@ class Corporation extends Model
         'date_founded',
         'description',
         'url',
+        'ticker',
         'tax_rate',
         'war_eligible',
         'npc',
