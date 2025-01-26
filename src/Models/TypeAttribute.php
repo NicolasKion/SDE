@@ -32,4 +32,11 @@ class TypeAttribute extends Model
     {
         return $this->belongsTo(ClassResolver::attribute());
     }
+
+    protected function casts(): array
+    {
+        return [
+            'value' => 'float'
+        ];
+    }
 }
