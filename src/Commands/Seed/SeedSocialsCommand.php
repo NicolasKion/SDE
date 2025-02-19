@@ -37,6 +37,7 @@ use Symfony\Component\Yaml\Yaml;
  *     members: int|null,
  *     shares: int,
  *     taxRate: float,
+ *     tickerName: string|null,
  * }>
  *
  * @phpstan-type BloodlinesResponse array<int,array{
@@ -127,6 +128,7 @@ class SeedSocialsCommand extends Command
                 'shares' => $values['shares'],
                 'tax_rate' => $values['taxRate'],
                 'war_eligible' => false,
+                'ticker' => $values['tickerName'] ?? null,
             ]);
         }
     }
