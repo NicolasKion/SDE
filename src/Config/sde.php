@@ -10,6 +10,7 @@ use NicolasKion\SDE\Models\Celestial;
 use NicolasKion\SDE\Models\Constellation;
 use NicolasKion\SDE\Models\Corporation;
 use NicolasKion\SDE\Models\Faction;
+use NicolasKion\SDE\Models\Flag;
 use NicolasKion\SDE\Models\Graphic;
 use NicolasKion\SDE\Models\Group;
 use NicolasKion\SDE\Models\Icon;
@@ -45,5 +46,6 @@ return [
         'Corporation' => Corporation::class,
         'Bloodline' => Bloodline::class,
         'Faction' => Faction::class,
+        'Flag' => Flag::class,
     ]
 ];

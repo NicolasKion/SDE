@@ -20,6 +20,7 @@ class SeedCommand extends Command
         $this->call('sde:seed:meta-groups');
         $this->call('sde:seed:categories');
         $this->call('sde:seed:groups');
+        $this->call('sde:seed:flags');
         $this->call('sde:seed:graphics');
         $this->call('sde:seed:races');
         $this->call('sde:seed:types');
