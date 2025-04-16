@@ -16,17 +16,17 @@
         }
     ],
     "require": {
-        "php": "^8.2.0",
+        "php": "^8.3.0",
         "ext-zip": "*",
-        "illuminate/contracts": "^10||^11",
-        "laravel/framework": "^11",
+        "illuminate/contracts": "^10||^11|^12",
+        "laravel/framework": "^11|^12",
         "symfony/yaml": "^7.2"
     },
     "require-dev": {
-        "laravel/pint": "^1.13.7",
-        "pestphp/pest": "^2.28.1",
-        "phpstan/phpstan": "^2.1.1",
-        "rector/rector": "^2.0.7",
+        "laravel/pint": "^v1.22.0",
+        "pestphp/pest": "^v3.8.1",
+        "phpstan/phpstan": "^2.1.12",
+        "rector/rector": "^2.0.11",
         "symfony/var-dumper": "^6.4.0|^7.0.0"
     },
     "autoload": {
