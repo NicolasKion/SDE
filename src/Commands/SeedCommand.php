@@ -27,6 +27,7 @@ class SeedCommand extends Command
             $this->call('sde:seed:flags');
             $this->call('sde:seed:graphics');
             $this->call('sde:seed:races');
+            $this->call('sde:seed:effects');
             $this->call('sde:seed:types');
             $this->call('sde:seed:type-attributes');
             $this->call('sde:seed:universe');

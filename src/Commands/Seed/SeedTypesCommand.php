@@ -25,6 +25,7 @@ use Symfony\Component\Yaml\Yaml;
  *     iconID: int|null,
  *     graphicID: int|null,
  *     metaGroupID: int|null,
+ *     factionID: int|null,
  * }>
  */
 class SeedTypesCommand extends BaseSeedCommand
@@ -62,6 +63,7 @@ class SeedTypesCommand extends BaseSeedCommand
                 'base_price' => $values['basePrice'] ?? null,
                 'radius' => $values['radius'] ?? null,
                 'icon_id' => $values['iconID'] ?? null,
+                'faction_id' => $values['factionID'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

@@ -29,6 +29,7 @@ return new class extends Migration {
         Schema::create('corporations', function (Blueprint $table) {
             $table->unsignedBigInteger('id')->primary();
             $table->string('name')->nullable()->index();
+            $table->string('ticker')->nullable()->index();
             $table->unsignedBigInteger('ceo_id')->nullable();
             $table->unsignedBigInteger('creator_id')->nullable();
             $table->unsignedBigInteger('faction_id')->nullable();

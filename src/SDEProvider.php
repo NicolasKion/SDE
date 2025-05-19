@@ -9,6 +9,7 @@ use NicolasKion\SDE\Commands\DownloadSDECommand;
 use NicolasKion\SDE\Commands\PrepareSDECommand;
 use NicolasKion\SDE\Commands\Seed\SeedAttributesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedCategoriesCommand;
+use NicolasKion\SDE\Commands\Seed\SeedEffectsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedFlagsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedGraphicsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedGroupsCommand;
@@ -58,6 +59,7 @@ class SDEProvider extends ServiceProvider
                 SeedTypeAttributesCommand::class,
                 SeedUniverseCommand::class,
                 SeedSocialsCommand::class,
+                SeedEffectsCommand::class,
             ]);
         }
     }

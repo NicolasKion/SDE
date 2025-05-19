@@ -12,6 +12,8 @@ use NicolasKion\SDE\Models\Celestial;
 use NicolasKion\SDE\Models\Character;
 use NicolasKion\SDE\Models\Constellation;
 use NicolasKion\SDE\Models\Corporation;
+use NicolasKion\SDE\Models\Effect;
+use NicolasKion\SDE\Models\EffectModifier;
 use NicolasKion\SDE\Models\Faction;
 use NicolasKion\SDE\Models\Flag;
 use NicolasKion\SDE\Models\Graphic;
@@ -25,6 +27,7 @@ use NicolasKion\SDE\Models\Solarsystem;
 use NicolasKion\SDE\Models\Station;
 use NicolasKion\SDE\Models\Type;
 use NicolasKion\SDE\Models\TypeAttribute;
+use NicolasKion\SDE\Models\TypeEffect;
 use NicolasKion\SDE\Models\Unit;
 
 class ClassResolver
@@ -222,4 +225,27 @@ class ClassResolver
         return self::getClass(Flag::class);
     }
 
+    /**
+     * @return class-string<Effect>
+     */
+    public static function effect(): string
+    {
+        return self::getClass(Effect::class);
+    }
+
+    /**
+     * @return class-string<TypeEffect>
+     */
+    public static function typeEffect(): string
+    {
+        return self::getClass(TypeEffect::class);
+    }
+
+    /**
+     * @return class-string<EffectModifier>
+     */
+    public static function effectModifier(): string
+    {
+        return self::getClass(EffectModifier::class);
+    }
 }

@@ -19,6 +19,7 @@ class Type extends Model
         'description',
         'graphic_id',
         'group_id',
+        'faction_id',
         'icon_id',
         'market_group_id',
         'meta_group_id',
@@ -87,5 +88,13 @@ class Type extends Model
     public function graphic(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::graphic());
+    }
+
+    /**
+     * @return HasMany<TypeEffect,$this>
+     */
+    public function typeEffects(): HasMany
+    {
+        return $this->hasMany(ClassResolver::typeEffect(), 'type_id');
     }
 }
