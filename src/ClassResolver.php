@@ -24,6 +24,8 @@ use NicolasKion\SDE\Models\MetaGroup;
 use NicolasKion\SDE\Models\Race;
 use NicolasKion\SDE\Models\Region;
 use NicolasKion\SDE\Models\Solarsystem;
+use NicolasKion\SDE\Models\SolarsystemConnection;
+use NicolasKion\SDE\Models\Stargate;
 use NicolasKion\SDE\Models\Station;
 use NicolasKion\SDE\Models\Type;
 use NicolasKion\SDE\Models\TypeAttribute;
@@ -42,7 +44,8 @@ class ClassResolver
 
     /**
      * @template T
-     * @param class-string<T> $class
+     *
+     * @param  class-string<T>  $class
      * @return class-string<T>
      */
     private static function getClass(string $class): string
@@ -50,7 +53,7 @@ class ClassResolver
         $class_name = class_basename($class);
 
         /** @var class-string<T> $value */
-        $value = config('sde.models.' . $class_name, $class);
+        $value = config('sde.models.'.$class_name, $class);
 
         return $value;
     }
@@ -95,7 +98,6 @@ class ClassResolver
         return self::getClass(MarketGroup::class);
     }
 
-
     /**
      * @return class-string<MetaGroup>
      */
@@ -103,7 +105,6 @@ class ClassResolver
     {
         return self::getClass(MetaGroup::class);
     }
-
 
     /**
      * @return class-string<Race>
@@ -247,5 +248,21 @@ class ClassResolver
     public static function effectModifier(): string
     {
         return self::getClass(EffectModifier::class);
+    }
+
+    /**
+     * @return class-string<Stargate>
+     */
+    public static function stargate(): string
+    {
+        return self::getClass(Stargate::class);
+    }
+
+    /**
+     * @return class-string<SolarsystemConnection>
+     */
+    public static function solarsystemConnection(): string
+    {
+        return self::getClass(SolarsystemConnection::class);
     }
 }

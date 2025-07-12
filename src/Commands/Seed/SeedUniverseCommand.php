@@ -7,26 +7,26 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Models\SolarsystemConnection;
+use NicolasKion\SDE\Models\Stargate;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 /**
  * @phpstan-type NamesFile array<int, array{
  *     itemID: int|null,
  *     itemName: string|null,
  * }>
- *
  * @phpstan-type RegionData array{
  *     regionID: int,
  * }
- *
  * @phpstan-type ConstellationData array{
  *     regionID: int,
  *     constellationID: int,
  * }
- *
- *
  * @phpstan-type Station array{
  *       regionID: int,
  *       constellationID: int,
@@ -35,7 +35,6 @@ use Symfony\Component\Yaml\Yaml;
  *       typeID: int,
  *       itemName: string,
  * }
- *
  * @phpstan-type Moon array{
  *      regionID: int,
  *      constellationID: int,
@@ -45,7 +44,6 @@ use Symfony\Component\Yaml\Yaml;
  *      itemName: string,
  *      npcStations: array<int,Station>|null
  * }
- *
  * @phpstan-type Planet array{
  *       regionID: int,
  *       constellationID: int,
@@ -56,23 +54,27 @@ use Symfony\Component\Yaml\Yaml;
  *       moons: array<int,Moon>|null,
  *       npcStations: array<int,Station>|null,
  * }
- *
  * @phpstan-type SolarsystemData array{
  *     regionID: int,
  *     constellationID: int,
  *     solarSystemID: int,
  *     security: string,
  *     center: array<int,int>,
- *     planets: array<int,Planet>|null
+ *     planets: array<int,Planet>|null,
+ *     stargates: array<int,Stargate>|null,
  * }
- *
+ * @phpstan-type Stargate array{
+ *     destination: int,
+ *     position: array<int,int>,
+ *     typeID: int,
+ * }
  */
 class SeedUniverseCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:universe';
 
     /**
-     * @throws Exception
+     * @throws Exception|Throwable
      */
     public function handle(): int
     {
@@ -201,10 +203,49 @@ class SeedUniverseCommand extends BaseSeedCommand
                                 }
                             }
                         });
+
+                        DB::transaction(function () use ($constellation_data, $solarsystem_data, $region_data) {
+                            Schema::disableForeignKeyConstraints();
+                            foreach ($solarsystem_data['stargates'] ?? [] as $stargate_id => $stargate_data) {
+                                Stargate::query()->updateOrInsert(['id' => $stargate_id], [
+                                    'solarsystem_id' => $solarsystem_data['solarSystemID'],
+                                    'destination_id' => $stargate_data['destination'],
+                                    'constellation_id' => $constellation_data['constellationID'],
+                                    'region_id' => $region_data['regionID'],
+                                    'position_x' => $stargate_data['position'][0],
+                                    'position_y' => $stargate_data['position'][1],
+                                    'position_z' => $stargate_data['position'][2],
+                                    'type_id' => $stargate_data['typeID'],
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            }
+                            Schema::enableForeignKeyConstraints();
+                        });
                     }
                 }
             }
         }
+
+        Stargate::query()->each(function (Stargate $stargate) {
+            DB::transaction(function () use ($stargate) {
+                Schema::disableForeignKeyConstraints();
+                $destination = Stargate::query()->find($stargate->destination_id);
+                SolarsystemConnection::query()->updateOrCreate([
+                    'from_stargate_id' => $stargate->id,
+                ], [
+                    'from_solarsystem_id' => $stargate->solarsystem_id,
+                    'from_region_id' => $stargate->region_id,
+                    'from_constellation_id' => $stargate->constellation_id,
+                    'to_stargate_id' => $stargate->destination_id,
+                    'to_solarsystem_id' => $destination?->solarsystem_id,
+                    'to_region_id' => $destination?->region_id,
+                    'to_constellation_id' => $destination?->constellation_id,
+                    'is_regional' => $stargate->region_id !== $destination?->region_id,
+                ]);
+                Schema::enableForeignKeyConstraints();
+            });
+        });
 
         $this->info('Successfully seeded universe');
 

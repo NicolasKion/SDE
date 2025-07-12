@@ -9,6 +9,8 @@ use NicolasKion\SDE\Models\Category;
 use NicolasKion\SDE\Models\Celestial;
 use NicolasKion\SDE\Models\Constellation;
 use NicolasKion\SDE\Models\Corporation;
+use NicolasKion\SDE\Models\Effect;
+use NicolasKion\SDE\Models\EffectModifier;
 use NicolasKion\SDE\Models\Faction;
 use NicolasKion\SDE\Models\Flag;
 use NicolasKion\SDE\Models\Graphic;
@@ -19,6 +21,8 @@ use NicolasKion\SDE\Models\MetaGroup;
 use NicolasKion\SDE\Models\Race;
 use NicolasKion\SDE\Models\Region;
 use NicolasKion\SDE\Models\Solarsystem;
+use NicolasKion\SDE\Models\SolarsystemConnection;
+use NicolasKion\SDE\Models\Stargate;
 use NicolasKion\SDE\Models\Station;
 use NicolasKion\SDE\Models\Type;
 use NicolasKion\SDE\Models\TypeAttribute;
@@ -47,5 +51,9 @@ return [
         'Bloodline' => Bloodline::class,
         'Faction' => Faction::class,
         'Flag' => Flag::class,
-    ]
+        'Effect' => Effect::class,
+        'EffectModifier' => EffectModifier::class,
+        'Stargate' => Stargate::class,
+        'SolarsystemConnection' => SolarsystemConnection::class,
+    ],
 ];
