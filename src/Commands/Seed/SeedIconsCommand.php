@@ -28,19 +28,30 @@ class SeedIconsCommand extends BaseSeedCommand
 
         $icon_file = 'sde/fsd/iconIDs.yaml';
 
+        $this->info(sprintf('Parsing icons from %s', $icon_file));
+
         /** @var IconsFile $data */
         $data = Yaml::parseFile(Storage::path($icon_file));
 
         $icon = ClassResolver::icon();
 
-        foreach ($data as $id => $values) {
-            $icon::query()->updateOrInsert(['id' => $id], [
-                'file' => $values['iconFile'],
-                'description' => $values['description'] ?? null,
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'file' => $item['iconFile'],
+                'description' => $item['description'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
         }
+
+        $this->chunkedUpsert(
+            $icon::query(),
+            $upsertData,
+            ['id'],
+            ['file', 'description', 'updated_at']
+        );
 
         $this->info(sprintf('Successfully seeded %d icons', count($data)));
 

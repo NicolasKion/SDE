@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
@@ -16,7 +15,7 @@ use Symfony\Component\Yaml\Yaml;
  *     iconID: int|null
  * }>
  */
-class SeedRacesCommand extends Command
+class SeedRacesCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:races';
 
@@ -24,20 +23,31 @@ class SeedRacesCommand extends Command
     {
         $file_name = 'sde/fsd/races.yaml';
 
+        $this->info(sprintf('Parsing races from %s', $file_name));
+
         /** @var RacesFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $race = ClassResolver::race();
 
-        foreach ($data as $id => $values) {
-            $race::query()->updateOrInsert(['id' => $id], [
-                'name' => $values['nameID']['en'],
-                'description' => $values['descriptionID']['en'] ?? null,
-                'icon_id' => $values['iconID'] ?? null,
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'name' => $item['nameID']['en'],
+                'description' => $item['descriptionID']['en'] ?? null,
+                'icon_id' => $item['iconID'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
         }
+
+        $this->chunkedUpsert(
+            $race::query(),
+            $upsertData,
+            ['id'],
+            ['name', 'description', 'icon_id', 'updated_at']
+        );
 
         $this->info(sprintf('Successfully seeded %d races', count($data)));
 

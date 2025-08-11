@@ -95,7 +95,17 @@ class SeedUniverseCommand extends BaseSeedCommand
         $celestialClass = ClassResolver::celestial();
         $stationClass = ClassResolver::station();
 
-        foreach ($directories as $type) {
+        // Collect all data first, then perform bulk operations
+        $this->info('Collecting universe data...');
+        $regionsData = [];
+        $constellationsData = [];
+        $solarsystemsData = [];
+        $celestialsData = [];
+        $stationsData = [];
+        $stargatesData = [];
+
+        foreach ($directories as $item) {
+            $type = $item;
             $type_name = basename($type);
 
             /** @var string[] $regions */
@@ -105,12 +115,13 @@ class SeedUniverseCommand extends BaseSeedCommand
                 /** @var RegionData $region_data */
                 $region_data = Yaml::parseFile(sprintf('%s/region.yaml', Storage::path($region)));
 
-                $regionClass::query()->updateOrInsert(['id' => $region_data['regionID']], [
+                $regionsData[] = [
+                    'id' => $region_data['regionID'],
                     'name' => $names[$region_data['regionID']]['itemName'] ?? '',
                     'type' => $type_name,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
 
                 /** @var string[] $constellations */
                 $constellations = Storage::directories($region);
@@ -119,13 +130,14 @@ class SeedUniverseCommand extends BaseSeedCommand
                     /** @var ConstellationData $constellation_data */
                     $constellation_data = Yaml::parseFile(sprintf('%s/constellation.yaml', Storage::path($constellation)));
 
-                    $constellationClass::query()->updateOrInsert(['id' => $constellation_data['constellationID']], [
+                    $constellationsData[] = [
+                        'id' => $constellation_data['constellationID'],
                         'region_id' => $region_data['regionID'],
                         'name' => $names[$constellation_data['constellationID']]['itemName'] ?? '',
                         'type' => $type_name,
                         'created_at' => now(),
                         'updated_at' => now(),
-                    ]);
+                    ];
 
                     /** @var string[] $solarsystems */
                     $solarsystems = Storage::directories($constellation);
@@ -134,7 +146,8 @@ class SeedUniverseCommand extends BaseSeedCommand
                         /** @var SolarsystemData $solarsystem_data */
                         $solarsystem_data = Yaml::parseFile(sprintf('%s/solarsystem.yaml', Storage::path($solarsystem)));
 
-                        $solarsystemClass::query()->updateOrInsert(['id' => $solarsystem_data['solarSystemID']], [
+                        $solarsystemsData[] = [
+                            'id' => $solarsystem_data['solarSystemID'],
                             'constellation_id' => $constellation_data['constellationID'],
                             'region_id' => $region_data['regionID'],
                             'name' => $names[$solarsystem_data['solarSystemID']]['itemName'] ?? '',
@@ -145,109 +158,193 @@ class SeedUniverseCommand extends BaseSeedCommand
                             'pos_z' => $solarsystem_data['center'][2],
                             'created_at' => now(),
                             'updated_at' => now(),
-                        ]);
+                        ];
 
-                        DB::transaction(function () use ($solarsystem_data, $celestialClass, $constellation_data, $region_data, $stationClass, $names) {
+                        // Collect planets
+                        foreach ($solarsystem_data['planets'] ?? [] as $planet_id => $planet_data) {
+                            $celestialsData[] = [
+                                'id' => $planet_id,
+                                'solarsystem_id' => $solarsystem_data['solarSystemID'],
+                                'constellation_id' => $constellation_data['constellationID'],
+                                'region_id' => $region_data['regionID'],
+                                'name' => $names[$planet_id]['itemName'] ?? '',
+                                'type_id' => $planet_data['typeID'],
+                                'group_id' => 7,
+                                'parent_id' => null,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ];
 
-                            foreach ($solarsystem_data['planets'] ?? [] as $planet_id => $planet_data) {
-                                $celestialClass::query()->updateOrInsert(['id' => $planet_id], [
+                            // Collect moons
+                            foreach ($planet_data['moons'] ?? [] as $moon_id => $moon_data) {
+                                $celestialsData[] = [
+                                    'id' => $moon_id,
                                     'solarsystem_id' => $solarsystem_data['solarSystemID'],
                                     'constellation_id' => $constellation_data['constellationID'],
                                     'region_id' => $region_data['regionID'],
-                                    'name' => $names[$planet_id]['itemName'] ?? '',
-                                    'type_id' => $planet_data['typeID'],
-                                    'group_id' => 7,
-                                    'parent_id' => null,
+                                    'name' => $names[$moon_id]['itemName'] ?? '',
+                                    'type_id' => $moon_data['typeID'],
+                                    'parent_id' => $planet_id,
+                                    'group_id' => 8,
                                     'created_at' => now(),
                                     'updated_at' => now(),
-                                ]);
+                                ];
 
-                                foreach ($planet_data['moons'] ?? [] as $moon_id => $moon_data) {
-                                    $celestialClass::query()->updateOrInsert(['id' => $moon_id], [
-                                        'solarsystem_id' => $solarsystem_data['solarSystemID'],
-                                        'constellation_id' => $constellation_data['constellationID'],
-                                        'region_id' => $region_data['regionID'],
-                                        'name' => $names[$moon_id]['itemName'] ?? '',
-                                        'type_id' => $moon_data['typeID'],
-                                        'parent_id' => $planet_id,
-                                        'group_id' => 8,
-                                        'created_at' => now(),
-                                        'updated_at' => now(),
-                                    ]);
-
-                                    foreach ($moon_data['npcStations'] ?? [] as $station_id => $station_data) {
-                                        $stationClass::query()->updateOrInsert(['id' => $station_id], [
-                                            'solarsystem_id' => $solarsystem_data['solarSystemID'],
-                                            'constellation_id' => $constellation_data['constellationID'],
-                                            'region_id' => $region_data['regionID'],
-                                            'name' => $names[$station_id]['itemName'] ?? '',
-                                            'type_id' => $station_data['typeID'],
-                                            'parent_id' => $moon_id,
-                                            'created_at' => now(),
-                                            'updated_at' => now(),
-                                        ]);
-                                    }
-                                }
-
-                                foreach ($planet_data['npcStations'] ?? [] as $station_id => $station_data) {
-                                    $stationClass::query()->updateOrInsert(['id' => $station_id], [
+                                // Collect moon stations
+                                foreach ($moon_data['npcStations'] ?? [] as $station_id => $station_data) {
+                                    $stationsData[] = [
+                                        'id' => $station_id,
                                         'solarsystem_id' => $solarsystem_data['solarSystemID'],
                                         'constellation_id' => $constellation_data['constellationID'],
                                         'region_id' => $region_data['regionID'],
                                         'name' => $names[$station_id]['itemName'] ?? '',
                                         'type_id' => $station_data['typeID'],
-                                        'parent_id' => $planet_id,
+                                        'parent_id' => $moon_id,
                                         'created_at' => now(),
                                         'updated_at' => now(),
-                                    ]);
+                                    ];
                                 }
                             }
-                        });
 
-                        DB::transaction(function () use ($constellation_data, $solarsystem_data, $region_data) {
-                            Schema::disableForeignKeyConstraints();
-                            foreach ($solarsystem_data['stargates'] ?? [] as $stargate_id => $stargate_data) {
-                                Stargate::query()->updateOrInsert(['id' => $stargate_id], [
+                            // Collect planet stations
+                            foreach ($planet_data['npcStations'] ?? [] as $station_id => $station_data) {
+                                $stationsData[] = [
+                                    'id' => $station_id,
                                     'solarsystem_id' => $solarsystem_data['solarSystemID'],
-                                    'destination_id' => $stargate_data['destination'],
                                     'constellation_id' => $constellation_data['constellationID'],
                                     'region_id' => $region_data['regionID'],
-                                    'position_x' => $stargate_data['position'][0],
-                                    'position_y' => $stargate_data['position'][1],
-                                    'position_z' => $stargate_data['position'][2],
-                                    'type_id' => $stargate_data['typeID'],
+                                    'name' => $names[$station_id]['itemName'] ?? '',
+                                    'type_id' => $station_data['typeID'],
+                                    'parent_id' => $planet_id,
                                     'created_at' => now(),
                                     'updated_at' => now(),
-                                ]);
+                                ];
                             }
-                            Schema::enableForeignKeyConstraints();
-                        });
+                        }
+
+                        // Collect stargates
+                        foreach ($solarsystem_data['stargates'] ?? [] as $stargate_id => $stargate_data) {
+                            $stargatesData[] = [
+                                'id' => $stargate_id,
+                                'solarsystem_id' => $solarsystem_data['solarSystemID'],
+                                'destination_id' => $stargate_data['destination'],
+                                'constellation_id' => $constellation_data['constellationID'],
+                                'region_id' => $region_data['regionID'],
+                                'position_x' => $stargate_data['position'][0],
+                                'position_y' => $stargate_data['position'][1],
+                                'position_z' => $stargate_data['position'][2],
+                                'type_id' => $stargate_data['typeID'],
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ];
+                        }
                     }
                 }
             }
         }
 
-        Stargate::query()->each(function (Stargate $stargate) {
-            DB::transaction(function () use ($stargate) {
-                Schema::disableForeignKeyConstraints();
-                $destination = Stargate::query()->find($stargate->destination_id);
-                SolarsystemConnection::query()->updateOrCreate([
-                    'from_stargate_id' => $stargate->id,
-                ], [
-                    'from_solarsystem_id' => $stargate->solarsystem_id,
-                    'from_region_id' => $stargate->region_id,
-                    'from_constellation_id' => $stargate->constellation_id,
-                    'to_stargate_id' => $stargate->destination_id,
-                    'to_solarsystem_id' => $destination?->solarsystem_id,
-                    'to_region_id' => $destination?->region_id,
-                    'to_constellation_id' => $destination?->constellation_id,
-                    'is_regional' => $stargate->region_id !== $destination?->region_id,
-                ]);
-                Schema::enableForeignKeyConstraints();
-            });
+        $this->chunkedUpsert(
+            $regionClass::query(),
+            $regionsData,
+            ['id'],
+            ['name', 'type', 'updated_at'],
+            'Upserting regions'
+        );
+
+        $this->chunkedUpsert(
+            $constellationClass::query(),
+            $constellationsData,
+            ['id'],
+            ['region_id', 'name', 'type', 'updated_at'],
+            'Upserting constellations'
+        );
+
+        $this->chunkedUpsert(
+            $solarsystemClass::query(),
+            $solarsystemsData,
+            ['id'],
+            ['constellation_id', 'region_id', 'name', 'type', 'security', 'pos_x', 'pos_y', 'pos_z', 'updated_at'],
+            'Upserting solarsystems'
+        );
+
+        $this->chunkedUpsert(
+            $celestialClass::query(),
+            $celestialsData,
+            ['id'],
+            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'group_id', 'parent_id', 'updated_at'],
+            'Upserting celestials'
+        );
+
+        $this->chunkedUpsert(
+            $stationClass::query(),
+            $stationsData,
+            ['id'],
+            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'parent_id', 'updated_at'],
+            'Upserting stations'
+        );
+
+        DB::transaction(function () use ($stargatesData) {
+            Schema::disableForeignKeyConstraints();
+            $this->chunkedUpsert(
+                Stargate::query(),
+                $stargatesData,
+                ['id'],
+                ['solarsystem_id', 'destination_id', 'constellation_id', 'region_id', 'position_x', 'position_y', 'position_z', 'type_id', 'updated_at'],
+                'Upserting stargates'
+            );
+            Schema::enableForeignKeyConstraints();
         });
 
-        $this->info('Successfully seeded universe');
+        $this->info('Generating stargate connections...');
+
+        // Get all stargates with their destination info in one query
+        $stargates = Stargate::query()
+            ->select(['id', 'destination_id', 'solarsystem_id', 'region_id', 'constellation_id'])
+            ->get()
+            ->keyBy('id');
+
+        $connectionsData = [];
+        foreach ($stargates as $stargate) {
+            $destination = $stargates->get($stargate->destination_id);
+            $connectionsData[] = [
+                'from_stargate_id' => $stargate->id,
+                'from_solarsystem_id' => $stargate->solarsystem_id,
+                'from_region_id' => $stargate->region_id,
+                'from_constellation_id' => $stargate->constellation_id,
+                'to_stargate_id' => $stargate->destination_id,
+                'to_solarsystem_id' => $destination?->solarsystem_id,
+                'to_region_id' => $destination?->region_id,
+                'to_constellation_id' => $destination?->constellation_id,
+                'is_regional' => $stargate->region_id !== $destination?->region_id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::transaction(function () use ($connectionsData) {
+            Schema::disableForeignKeyConstraints();
+
+            $this->chunkedUpsert(
+                SolarsystemConnection::query(),
+                $connectionsData,
+                ['from_stargate_id'],
+                ['from_solarsystem_id', 'from_region_id', 'from_constellation_id', 'to_stargate_id', 'to_solarsystem_id', 'to_region_id', 'to_constellation_id', 'is_regional', 'updated_at'],
+                'Upserting stargate connections'
+            );
+
+            Schema::enableForeignKeyConstraints();
+        });
+
+        $this->info(sprintf(
+            'Successfully seeded universe: %d regions, %d constellations, %d solarsystems, %d celestials, %d stations, %d stargates, %d connections',
+            count($regionsData),
+            count($constellationsData),
+            count($solarsystemsData),
+            count($celestialsData),
+            count($stationsData),
+            count($stargatesData),
+            count($connectionsData)
+        ));
 
         return self::SUCCESS;
     }

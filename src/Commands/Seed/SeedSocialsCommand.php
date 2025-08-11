@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +23,6 @@ use Symfony\Component\Yaml\Yaml;
  *     station_count: int,
  *     station_system_count: int,
  * }>
- *
  * @phpstan-type CorporationsFile array<int, array{
  *     stationID: int|null,
  *     ceoID: int|null,
@@ -39,7 +37,6 @@ use Symfony\Component\Yaml\Yaml;
  *     taxRate: float,
  *     tickerName: string|null,
  * }>
- *
  * @phpstan-type BloodlinesResponse array<int,array{
  *     bloodline_id: int,
  *     name: string,
@@ -54,10 +51,13 @@ use Symfony\Component\Yaml\Yaml;
  *     willpower: int,
  * }>
  */
-class SeedSocialsCommand extends Command
+class SeedSocialsCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:socials';
 
+    /**
+     * @throws ConnectionException
+     */
     public function handle(): int
     {
         $this->seedFactions();
@@ -74,29 +74,44 @@ class SeedSocialsCommand extends Command
      */
     private function seedFactions(): void
     {
+        $this->info('Fetching factions from ESI API');
+
         /** @var FactionsResponse $factionEsi */
         $factionEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/factions/')->json();
 
         $faction = ClassResolver::faction();
 
-        foreach ($factionEsi as $values) {
-            $faction::query()->updateOrInsert(['id' => $values['faction_id']], [
-                'name' => $values['name'],
-                'description' => $values['description'] ?? null,
+        $upsertData = [];
+        foreach ($factionEsi as $item) {
+            $upsertData[] = [
+                'id' => $item['faction_id'],
+                'name' => $item['name'],
+                'description' => $item['description'] ?? null,
                 'corporation_id' => null, // seed later due to fk
-                'is_unique' => $values['is_unique'],
+                'is_unique' => $item['is_unique'],
                 'militia_corporation_id' => null,
-                'size_factor' => $values['size_factor'],
-                'solarsystem_id' => $values['solar_system_id'],
-                'station_count' => $values['station_count'],
-                'station_system_count' => $values['station_system_count']
-            ]);
+                'size_factor' => $item['size_factor'],
+                'solarsystem_id' => $item['solar_system_id'],
+                'station_count' => $item['station_count'],
+                'station_system_count' => $item['station_system_count'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
+
+        $this->chunkedUpsert(
+            $faction::query(),
+            $upsertData,
+            ['id'],
+            ['name', 'description', 'corporation_id', 'is_unique', 'militia_corporation_id', 'size_factor', 'solarsystem_id', 'station_count', 'station_system_count', 'updated_at']
+        );
     }
 
     private function seedCorps(): void
     {
         $file_name = 'sde/fsd/npcCorporations.yaml';
+
+        $this->info(sprintf('Parsing corporations from %s', $file_name));
 
         /** @var CorporationsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
@@ -112,25 +127,38 @@ class SeedSocialsCommand extends Command
 
         $char::createFromIds($char_ids);
 
-        foreach ($data as $id => $values) {
-            $stationData = $station::query()->find($values['stationID'] ?? null);
-            $corp::query()->updateOrInsert(['id' => $id], [
-                'ceo_id' => $values['ceoID'] ?? null,
+        // For corporations, we need to handle station lookups, so we'll keep individual processing
+        // but collect data for bulk upsert
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $stationData = $station::query()->find($item['stationID'] ?? null);
+            $upsertData[] = [
+                'id' => $key,
+                'ceo_id' => $item['ceoID'] ?? null,
                 'creator_id' => null,
                 'home_station_id' => $stationData->id ?? null,
-                'faction_id' => $values['factionID'] ?? null,
-                'date_founded' => $values['dateFounded'] ?? null,
-                'url' => $values['url'] ?? null,
-                'name' => $values['nameID']['en'],
-                'description' => $values['descriptionID']['en'] ?? null,
-                'member_count' => $values['members'] ?? null,
+                'faction_id' => $item['factionID'] ?? null,
+                'date_founded' => $item['dateFounded'] ?? null,
+                'url' => $item['url'] ?? null,
+                'name' => $item['nameID']['en'],
+                'description' => $item['descriptionID']['en'] ?? null,
+                'member_count' => $item['members'] ?? null,
                 'npc' => true,
-                'shares' => $values['shares'],
-                'tax_rate' => $values['taxRate'],
+                'shares' => $item['shares'],
+                'tax_rate' => $item['taxRate'],
                 'war_eligible' => false,
-                'ticker' => $values['tickerName'] ?? null,
-            ]);
+                'ticker' => $item['tickerName'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
+
+        $this->chunkedUpsert(
+            $corp::query(),
+            $upsertData,
+            ['id'],
+            ['ceo_id', 'creator_id', 'home_station_id', 'faction_id', 'date_founded', 'url', 'name', 'description', 'member_count', 'npc', 'shares', 'tax_rate', 'war_eligible', 'ticker', 'updated_at']
+        );
     }
 
     /**
@@ -138,24 +166,37 @@ class SeedSocialsCommand extends Command
      */
     private function seedBloodlines(): void
     {
+        $this->info('Fetching bloodlines from ESI API');
+
         /** @var BloodlinesResponse $bloodlinesEsi */
         $bloodlinesEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/bloodlines/')->json();
 
         $bloodline = ClassResolver::bloodline();
 
-        foreach ($bloodlinesEsi as $values) {
-            $bloodline::query()->updateOrInsert(['id' => $values['bloodline_id']], [
-                'name' => $values['name'],
-                'description' => $values['description'] ?? null,
-                'corporation_id' => $values['corporation_id'],
-                'ship_type_id' => $values['ship_type_id'],
-                'race_id' => $values['race_id'],
-                'intelligence' => $values['intelligence'],
-                'charisma' => $values['charisma'],
-                'perception' => $values['perception'],
-                'memory' => $values['memory'],
-                'willpower' => $values['willpower'],
-            ]);
+        $upsertData = [];
+        foreach ($bloodlinesEsi as $item) {
+            $upsertData[] = [
+                'id' => $item['bloodline_id'],
+                'name' => $item['name'],
+                'description' => $item['description'] ?? null,
+                'corporation_id' => $item['corporation_id'],
+                'ship_type_id' => $item['ship_type_id'],
+                'race_id' => $item['race_id'],
+                'intelligence' => $item['intelligence'],
+                'charisma' => $item['charisma'],
+                'perception' => $item['perception'],
+                'memory' => $item['memory'],
+                'willpower' => $item['willpower'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
+
+        $this->chunkedUpsert(
+            $bloodline::query(),
+            $upsertData,
+            ['id'],
+            ['name', 'description', 'corporation_id', 'ship_type_id', 'race_id', 'intelligence', 'charisma', 'perception', 'memory', 'willpower', 'updated_at']
+        );
     }
 }

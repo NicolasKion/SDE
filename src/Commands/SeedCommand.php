@@ -33,11 +33,13 @@ class SeedCommand extends Command
             $this->call('sde:seed:universe');
             $this->call('sde:seed:socials');
         } catch (Exception $e) {
-            $this->error('An error occurred while seeding: ' . $e->getMessage());
+            $this->error('An error occurred while seeding: '.$e->getMessage());
+
             return self::FAILURE;
         } finally {
             Schema::enableForeignKeyConstraints();
         }
+
         return self::SUCCESS;
     }
 }

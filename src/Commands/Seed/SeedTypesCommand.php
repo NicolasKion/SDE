@@ -41,33 +41,44 @@ class SeedTypesCommand extends BaseSeedCommand
 
         $file = 'sde/fsd/types.yaml';
 
+        $this->info(sprintf('Parsing types from %s', $file));
+
         /** @var TypesFile $data */
         $data = Yaml::parseFile(Storage::path($file));
 
         $type = ClassResolver::type();
 
-        foreach ($data as $id => $values) {
-            $type::query()->updateOrCreate(['id' => $id], [
-                'id' => $id,
-                'name' => $values['name']['en'],
-                'description' => $values['description']['en'] ?? null,
-                'group_id' => $values['groupID'],
-                'market_group_id' => $values['marketGroupID'] ?? null,
-                'graphic_id' => $values['graphicID'] ?? null,
-                'meta_group_id' => $values['metaGroupID'] ?? null,
-                'published' => $values['published'] ?? true,
-                'mass' => $values['mass'] ?? null,
-                'volume' => $values['volume'] ?? null,
-                'capacity' => $values['capacity'] ?? null,
-                'portion_size' => $values['portionSize'] ?? null,
-                'base_price' => $values['basePrice'] ?? null,
-                'radius' => $values['radius'] ?? null,
-                'icon_id' => $values['iconID'] ?? null,
-                'faction_id' => $values['factionID'] ?? null,
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'name' => $item['name']['en'],
+                'description' => $item['description']['en'] ?? null,
+                'group_id' => $item['groupID'],
+                'market_group_id' => $item['marketGroupID'] ?? null,
+                'graphic_id' => $item['graphicID'] ?? null,
+                'meta_group_id' => $item['metaGroupID'] ?? null,
+                'published' => $item['published'] ?? true,
+                'mass' => $item['mass'] ?? null,
+                'volume' => $item['volume'] ?? null,
+                'capacity' => $item['capacity'] ?? null,
+                'portion_size' => $item['portionSize'] ?? null,
+                'base_price' => $item['basePrice'] ?? null,
+                'radius' => $item['radius'] ?? null,
+                'icon_id' => $item['iconID'] ?? null,
+                'faction_id' => $item['factionID'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
         }
+
+        $this->chunkedUpsert(
+            $type::query(),
+            $upsertData,
+            ['id'],
+            ['name', 'description', 'group_id', 'market_group_id', 'graphic_id', 'meta_group_id', 'published', 'mass', 'volume', 'capacity', 'portion_size', 'base_price', 'radius', 'icon_id', 'faction_id', 'updated_at'],
+            'Upserting types'
+        );
 
         $this->info(sprintf('Successfully seeded %d types', count($data)));
 

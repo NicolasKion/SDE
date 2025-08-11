@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 /**
  * @phpstan-type MetaGroupsFile array<int, array{
@@ -18,30 +18,44 @@ use Symfony\Component\Yaml\Yaml;
  *     descriptionID: array{en:string|null},
  * }>
  */
-class SeedMetaGroupsCommand extends Command
+class SeedMetaGroupsCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:meta-groups';
 
+    /**
+     * @throws Throwable
+     */
     public function handle(): int
     {
         $file_name = 'sde/fsd/metaGroups.yaml';
+
+        $this->info(sprintf('Parsing meta groups from %s', $file_name));
 
         /** @var MetaGroupsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $metaGroup = ClassResolver::metaGroup();
 
-        DB::transaction(function () use ($data, $metaGroup) {
-            foreach ($data as $id => $values) {
-                $metaGroup::query()->updateOrInsert(['id' => $id], [
-                    'name' => $values['nameID']['en'],
-                    'icon_id' => $values['iconID'] ?? null,
-                    'icon_suffix' => $values['iconSuffix'] ?? null,
-                    'description' => $values['descriptionID']['en'] ?? null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'name' => $item['nameID']['en'],
+                'icon_id' => $item['iconID'] ?? null,
+                'icon_suffix' => $item['iconSuffix'] ?? null,
+                'description' => $item['descriptionID']['en'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::transaction(function () use ($upsertData, $metaGroup) {
+            $this->chunkedUpsert(
+                $metaGroup::query(),
+                $upsertData,
+                ['id'],
+                ['name', 'icon_id', 'icon_suffix', 'description', 'updated_at']
+            );
         });
 
         $this->info(sprintf('Successfully seeded %d meta groups', count($data)));

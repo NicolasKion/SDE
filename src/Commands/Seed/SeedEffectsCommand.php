@@ -73,44 +73,54 @@ class SeedEffectsCommand extends BaseSeedCommand
 
         $file = 'sde/fsd/dogmaEffects.yaml';
 
+        $this->info(sprintf('Parsing effects from %s', $file));
+
         /** @var DogmaEffectsFile $data */
         $data = Yaml::parseFile(Storage::path($file));
 
         $effect = ClassResolver::effect();
         $effectModifier = ClassResolver::effectModifier();
 
-        foreach ($data as $id => $values) {
-            $effect::query()->updateOrCreate(['id' => $id], [
-                'name' => $values['effectName'],
-                'description' => $values['descriptionID']['en'] ?? null,
-                'icon_id' => $values['iconID'] ?? null,
-                'sfx_name' => $values['sfxName'] ?? null,
-                'published' => $values['published'] ?? true,
-                'is_assistance' => $values['isAssistance'] ?? false,
-                'is_offensive' => $values['isOffensive'] ?? false,
-                'is_warp_safe' => $values['isWarpSafe'] ?? false,
-                'discharge_attribute_id' => $values['dischargeAttributeID'] ?? null,
-                'duration_attribute_id' => $values['durationAttributeID'] ?? null,
-                'distribution' => $values['distribution'] ?? null,
-                'falloff_attribute_id' => $values['falloffAttributeID'] ?? null,
-                'range_attribute_id' => $values['rangeAttributeID'] ?? null,
-                'tracking_speed_attribute_id' => $values['trackingSpeedAttributeID'] ?? null,
-                'propulsion_chance' => $values['propulsionChance'] ?? false,
-                'electronic_chance' => $values['electronicChance'] ?? false,
-                'effect_category' => $values['effectCategory'] ?? null,
-                'disallow_auto_repeat' => $values['disallowAutoRepeat'] ?? false,
-                'display_name' => $values['displayName'] ?? null,
-                'post_expression' => $values['postExpression'] ?? null,
-                'pre_expression' => $values['preExpression'] ?? null,
-                'range_chance' => $values['rangeChance'] ?? false,
-                'fitting_usage_chance_attribute_id' => $values['fittingUsageChanceAttributeID'] ?? null,
-                'resistance_attribute_id' => $values['resistanceAttributeID'] ?? null,
-            ]);
+        // Prepare effects data
+        $effectsData = [];
+        $modifiersData = [];
 
-            if (isset($values['modifierInfo'])) {
-                foreach ($values['modifierInfo'] as $modifier) {
-                    $effectModifier::query()->updateOrCreate([
-                        'effect_id' => $id,
+        foreach ($data as $key => $item) {
+            $effectsData[] = [
+                'id' => $key,
+                'name' => $item['effectName'],
+                'description' => $item['descriptionID']['en'] ?? null,
+                'icon_id' => $item['iconID'] ?? null,
+                'sfx_name' => $item['sfxName'] ?? null,
+                'published' => $item['published'] ?? true,
+                'is_assistance' => $item['isAssistance'] ?? false,
+                'is_offensive' => $item['isOffensive'] ?? false,
+                'is_warp_safe' => $item['isWarpSafe'] ?? false,
+                'discharge_attribute_id' => $item['dischargeAttributeID'] ?? null,
+                'duration_attribute_id' => $item['durationAttributeID'] ?? null,
+                'distribution' => $item['distribution'] ?? null,
+                'falloff_attribute_id' => $item['falloffAttributeID'] ?? null,
+                'range_attribute_id' => $item['rangeAttributeID'] ?? null,
+                'tracking_speed_attribute_id' => $item['trackingSpeedAttributeID'] ?? null,
+                'propulsion_chance' => $item['propulsionChance'] ?? false,
+                'electronic_chance' => $item['electronicChance'] ?? false,
+                'effect_category' => $item['effectCategory'] ?? null,
+                'disallow_auto_repeat' => $item['disallowAutoRepeat'] ?? false,
+                'display_name' => $item['displayName'] ?? null,
+                'post_expression' => $item['postExpression'] ?? null,
+                'pre_expression' => $item['preExpression'] ?? null,
+                'range_chance' => $item['rangeChance'] ?? false,
+                'fitting_usage_chance_attribute_id' => $item['fittingUsageChanceAttributeID'] ?? null,
+                'resistance_attribute_id' => $item['resistanceAttributeID'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            // Collect modifiers
+            if (isset($item['modifierInfo'])) {
+                foreach ($item['modifierInfo'] as $modifier) {
+                    $modifiersData[] = [
+                        'effect_id' => $key,
                         'domain' => $modifier['domain'] ?? null,
                         'func' => $modifier['func'] ?? null,
                         'modified_attribute_id' => $modifier['modifiedAttributeID'] ?? null,
@@ -118,11 +128,30 @@ class SeedEffectsCommand extends BaseSeedCommand
                         'operator' => $modifier['operation'] ?? null,
                         'group_id' => $modifier['groupID'] ?? null,
                         'skill_type_id' => $modifier['skillTypeID'] ?? null,
-                    ]);
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
                 }
             }
         }
 
+        $this->chunkedUpsert(
+            $effect::query(),
+            $effectsData,
+            ['id'],
+            ['name', 'description', 'icon_id', 'sfx_name', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'distribution', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'post_expression', 'pre_expression', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
+        );
+
+        if (! empty($modifiersData)) {
+            $this->chunkedUpsert(
+                $effectModifier::query(),
+                $modifiersData,
+                ['effect_id', 'domain', 'func', 'modified_attribute_id', 'modifying_attribute_id'],
+                ['operator', 'group_id', 'skill_type_id', 'updated_at']
+            );
+        }
+
+        $this->info(sprintf('Successfully seeded %d effects', count($data)));
 
         return self::SUCCESS;
     }

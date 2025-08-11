@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +20,7 @@ use Throwable;
  *     hasTypes: boolean|null,
  * }>
  */
-class SeedMarketGroupsCommand extends Command
+class SeedMarketGroupsCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:market-groups';
 
@@ -32,28 +31,38 @@ class SeedMarketGroupsCommand extends Command
     {
         $file_name = 'sde/fsd/marketGroups.yaml';
 
+        $this->info(sprintf('Parsing market groups from %s', $file_name));
+
         /** @var MarketGroupsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $marketGroup = ClassResolver::marketGroup();
 
-        DB::transaction(function () use ($data, $marketGroup) {
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'parent_id' => $item['parentGroupID'] ?? null,
+                'name' => $item['nameID']['en'],
+                'description' => $item['descriptionID']['en'] ?? null,
+                'icon_id' => $item['iconID'] ?? null,
+                'has_types' => $item['hasTypes'] ?? true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::transaction(function () use ($upsertData, $marketGroup) {
             Schema::disableForeignKeyConstraints();
 
-            foreach ($data as $id => $values) {
-                $marketGroup::query()->updateOrInsert(['id' => $id], [
-                    'parent_id' => $values['parentGroupID'] ?? null,
-                    'name' => $values['nameID']['en'],
-                    'description' => $values['descriptionID']['en'] ?? null,
-                    'icon_id' => $values['iconID'] ?? null,
-                    'has_types' => $values['hasTypes'] ?? true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            $this->chunkedUpsert(
+                $marketGroup::query(),
+                $upsertData,
+                ['id'],
+                ['parent_id', 'name', 'description', 'icon_id', 'has_types', 'updated_at']
+            );
 
             Schema::enableForeignKeyConstraints();
-
         });
         $this->info(sprintf('Successfully seeded %d market groups', count($data)));
 

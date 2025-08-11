@@ -17,11 +17,11 @@ class PrepareSDECommand extends Command
     {
         $sde_zip = 'sde/sde.zip';
 
-        if (!Storage::fileExists($sde_zip)) {
+        if (! Storage::fileExists($sde_zip)) {
             $this->error('Missing SDE! Download it first!');
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         $zip->open(Storage::path($sde_zip));
 
@@ -43,11 +43,11 @@ class PrepareSDECommand extends Command
     {
         $content = Storage::get($file);
 
-        if (!$content) {
+        if (! $content) {
             throw new Exception('File not found!');
         }
 
-        $content = (string)preg_replace('/["\']\s+["\']/', '', $content);
+        $content = (string) preg_replace('/["\']\s+["\']/', '', $content);
 
         Storage::put($file, $content);
     }

@@ -19,12 +19,14 @@ class DownloadSDECommand extends Command
         if ($response->failed()) {
             $this->error('Failed to download SDE!');
             $this->error($response->body());
+
             return self::FAILURE;
         }
 
         Storage::put('sde/sde.zip', $response->getBody());
 
         $this->info('Successfully downloaded the SDE and saved it into storage');
+
         return self::SUCCESS;
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
@@ -17,7 +16,7 @@ use Symfony\Component\Yaml\Yaml;
  *     sofRaceName: string|null,
  * }>
  */
-class SeedGraphicsCommand extends Command
+class SeedGraphicsCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:graphics';
 
@@ -25,19 +24,32 @@ class SeedGraphicsCommand extends Command
     {
         $file_name = 'sde/fsd/graphicIDs.yaml';
 
+        $this->info(sprintf('Parsing graphics from %s', $file_name));
+
         /** @var GraphicsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $graphic = ClassResolver::graphic();
 
-        foreach ($data as $id => $values) {
-            $graphic::query()->updateOrInsert(['id' => $id], [
-                'file' => $values['iconInfo']['folder'] ?? null,
-                'sof_faction_name' => $values['sofFactionName'] ?? null,
-                'sof_hull_name' => $values['sofHullName'] ?? null,
-                'sof_race_name' => $values['sofRaceName'] ?? null,
-            ]);
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'file' => $item['iconInfo']['folder'] ?? null,
+                'sof_faction_name' => $item['sofFactionName'] ?? null,
+                'sof_hull_name' => $item['sofHullName'] ?? null,
+                'sof_race_name' => $item['sofRaceName'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
+
+        $this->chunkedUpsert(
+            $graphic::query(),
+            $upsertData,
+            ['id'],
+            ['file', 'sof_faction_name', 'sof_hull_name', 'sof_race_name', 'updated_at']
+        );
 
         $this->info(sprintf('Successfully seeded %d graphics', count($data)));
 

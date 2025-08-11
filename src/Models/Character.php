@@ -29,13 +29,12 @@ class Character extends Model
     ];
 
     /**
-     * @param int[] $ids
-     * @return void
+     * @param  int[]  $ids
      */
     public static function createFromIds(array $ids): void
     {
-        DB::transaction(fn() => self::query()->upsert(
-            collect($ids)->map(fn($id) => ['id' => $id])->toArray(),
+        DB::transaction(fn () => self::query()->upsert(
+            collect($ids)->map(fn ($id) => ['id' => $id])->toArray(),
             ['id']
         ), 5);
     }

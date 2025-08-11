@@ -29,15 +29,15 @@ class SDEProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishesMigrations([
-            __DIR__ . '/migrations' => database_path('migrations')
+            __DIR__.'/migrations' => database_path('migrations'),
         ], 'sde-migrations');
 
         $this->publishes([
-            __DIR__ . '/Models' => app_path('Models')
+            __DIR__.'/Models' => app_path('Models'),
         ], 'sde-models');
 
         $this->publishes([
-            __DIR__ . '/Config/sde.php' => config_path('sde.php')
+            __DIR__.'/Config/sde.php' => config_path('sde.php'),
         ], 'sde-config');
 
         if ($this->app->runningInConsole()) {

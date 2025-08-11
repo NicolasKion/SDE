@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
@@ -19,7 +18,7 @@ use Symfony\Component\Yaml\Yaml;
  *     useBasePrice: boolean|null,
  * }>
  */
-class SeedGroupsCommand extends Command
+class SeedGroupsCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:groups';
 
@@ -27,23 +26,34 @@ class SeedGroupsCommand extends Command
     {
         $file_name = 'sde/fsd/groups.yaml';
 
+        $this->info(sprintf('Parsing groups from %s', $file_name));
+
         /** @var GroupsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $group = ClassResolver::group();
 
-        foreach ($data as $id => $values) {
-            $group::query()->updateOrInsert(['id' => $id], [
-                'name' => $values['name']['en'],
-                'category_id' => $values['categoryID'],
-                'published' => $values['published'] ?? true,
-                'anchorable' => $values['anchorable'] ?? false,
-                'fittable_non_singleton' => $values['fittableNonSingleton'] ?? false,
-                'use_base_price' => $values['useBasePrice'] ?? false,
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'name' => $item['name']['en'],
+                'category_id' => $item['categoryID'],
+                'published' => $item['published'] ?? true,
+                'anchorable' => $item['anchorable'] ?? false,
+                'fittable_non_singleton' => $item['fittableNonSingleton'] ?? false,
+                'use_base_price' => $item['useBasePrice'] ?? false,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
         }
+
+        $this->chunkedUpsert(
+            $group::query(),
+            $upsertData,
+            ['id'],
+            ['name', 'category_id', 'published', 'anchorable', 'fittable_non_singleton', 'use_base_price', 'updated_at']
+        );
 
         $this->info(sprintf('Successfully seeded %d groups', count($data)));
 

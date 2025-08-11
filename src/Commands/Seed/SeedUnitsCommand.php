@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use NicolasKion\SDE\ClassResolver;
 
@@ -15,13 +15,19 @@ use NicolasKion\SDE\ClassResolver;
  *     name: string|null
  * }>
  */
-class SeedUnitsCommand extends Command
+class SeedUnitsCommand extends BaseSeedCommand
 {
-    protected const UNITS_URL = 'https://sde.hoboleaks.space/tq/dogmaunits.json';
+    protected const string UNITS_URL = 'https://sde.hoboleaks.space/tq/dogmaunits.json';
+
     protected $signature = 'sde:seed:units';
 
+    /**
+     * @throws ConnectionException
+     */
     public function handle(): int
     {
+        $this->info(sprintf('Fetching units from %s', self::UNITS_URL));
+
         $response = Http::get(self::UNITS_URL);
 
         /** @var UnitsResponse $data */
@@ -29,21 +35,24 @@ class SeedUnitsCommand extends Command
 
         $unit = ClassResolver::unit();
 
-        foreach ($data as $id => $values) {
-            $name = $values['name'] ?? '';
-            $display_name = $values['displayName'] ?? '';
-            $description = $values['description'] ?? '';
-
-            $unit::query()->updateOrInsert([
-                'id' => $id,
-            ], [
-                    'id' => $id,
-                    'display_name' => $display_name,
-                    'description' => $description,
-                    'name' => $name,
-                ]
-            );
+        $upsertData = [];
+        foreach ($data as $key => $item) {
+            $upsertData[] = [
+                'id' => $key,
+                'display_name' => $item['displayName'] ?? '',
+                'description' => $item['description'] ?? '',
+                'name' => $item['name'] ?? '',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
+
+        $this->chunkedUpsert(
+            $unit::query(),
+            $upsertData,
+            ['id'],
+            ['display_name', 'description', 'name', 'updated_at']
+        );
 
         $this->info(sprintf('Successfully seeded %d units', count($data)));
 

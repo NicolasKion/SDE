@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use Symfony\Component\Yaml\Yaml;
@@ -17,7 +16,7 @@ use Symfony\Component\Yaml\Yaml;
  *     orderID: int,
  * }>
  */
-class SeedFlagsCommand extends Command
+class SeedFlagsCommand extends BaseSeedCommand
 {
     protected $signature = 'sde:seed:flags';
 
@@ -25,20 +24,31 @@ class SeedFlagsCommand extends Command
     {
         $file_name = 'sde/bsd/invFlags.yaml';
 
+        $this->info(sprintf('Parsing flags from %s', $file_name));
+
         /** @var FlagsFile $data */
         $data = Yaml::parseFile(Storage::path($file_name));
 
         $flag = ClassResolver::flag();
 
-        foreach ($data as $values) {
-            $flag::query()->updateOrInsert(['id' => $values['flagID']], [
-                'name' => $values['flagName'],
-                'text' => $values['flagText'] ?? '',
-                'order_id' => $values['orderID'],
+        $upsertData = [];
+        foreach ($data as $item) {
+            $upsertData[] = [
+                'id' => $item['flagID'],
+                'name' => $item['flagName'],
+                'text' => $item['flagText'] ?? '',
+                'order_id' => $item['orderID'],
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
         }
+
+        $this->chunkedUpsert(
+            $flag::query(),
+            $upsertData,
+            ['id'],
+            ['name', 'text', 'order_id', 'updated_at']
+        );
 
         $this->info(sprintf('Successfully seeded %d flags', count($data)));
 
