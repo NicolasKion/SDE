@@ -104,7 +104,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $stationsData = [];
         $stargatesData = [];
 
-        $jove_observatories = require __DIR__.'/../../data/jove_observatories.php';
+        $jove_observatories = require __DIR__.'/../../Data/jove_observatories.php';
         $jove_observatories = array_flip($jove_observatories);
 
         foreach ($directories as $item) {
