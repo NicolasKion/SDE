@@ -23,6 +23,7 @@ return new class extends Migration
             $table->double('pos_y');
             $table->double('pos_z');
             $table->string('type')->index();
+            $table->boolean('has_jove_observatory')->default(false);
             $table->timestamps();
         });
     }

@@ -104,6 +104,9 @@ class SeedUniverseCommand extends BaseSeedCommand
         $stationsData = [];
         $stargatesData = [];
 
+        $jove_observatories = require __DIR__.'/../../data/jove_observatories.php';
+        $jove_observatories = array_flip($jove_observatories);
+
         foreach ($directories as $item) {
             $type = $item;
             $type_name = basename($type);
@@ -146,16 +149,20 @@ class SeedUniverseCommand extends BaseSeedCommand
                         /** @var SolarsystemData $solarsystem_data */
                         $solarsystem_data = Yaml::parseFile(sprintf('%s/solarsystem.yaml', Storage::path($solarsystem)));
 
+                        $name = $names[$solarsystem_data['solarSystemID']]['itemName'] ?? '';
+                        $has_jove_observatory = isset($jove_observatories[$name]);
+
                         $solarsystemsData[] = [
                             'id' => $solarsystem_data['solarSystemID'],
                             'constellation_id' => $constellation_data['constellationID'],
                             'region_id' => $region_data['regionID'],
-                            'name' => $names[$solarsystem_data['solarSystemID']]['itemName'] ?? '',
+                            'name' => $name,
                             'type' => $type_name,
                             'security' => $solarsystem_data['security'],
                             'pos_x' => $solarsystem_data['center'][0],
                             'pos_y' => $solarsystem_data['center'][1],
                             'pos_z' => $solarsystem_data['center'][2],
+                            'has_jove_observatory' => $has_jove_observatory,
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
@@ -263,7 +270,7 @@ class SeedUniverseCommand extends BaseSeedCommand
             $solarsystemClass::query(),
             $solarsystemsData,
             ['id'],
-            ['constellation_id', 'region_id', 'name', 'type', 'security', 'pos_x', 'pos_y', 'pos_z', 'updated_at'],
+            ['constellation_id', 'region_id', 'name', 'type', 'security', 'pos_x', 'pos_y', 'pos_z', 'updated_at', 'has_jove_observatory'],
             'Upserting solarsystems'
         );
 

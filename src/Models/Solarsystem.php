@@ -23,6 +23,7 @@ class Solarsystem extends Model
         'pos_y',
         'pos_z',
         'type',
+        'has_jove_observatory',
     ];
 
     /**
