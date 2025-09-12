@@ -15,6 +15,8 @@ use NicolasKion\SDE\Models\Stargate;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
+use function array_flip;
+
 /**
  * @phpstan-type NamesFile array<int, array{
  *     itemID: int|null,
@@ -105,7 +107,6 @@ class SeedUniverseCommand extends BaseSeedCommand
         $stargatesData = [];
 
         $jove_observatories = require __DIR__.'/../../Data/jove_observatories.php';
-        $jove_observatories = array_flip($jove_observatories);
 
         foreach ($directories as $item) {
             $type = $item;
@@ -118,13 +119,18 @@ class SeedUniverseCommand extends BaseSeedCommand
                 /** @var RegionData $region_data */
                 $region_data = Yaml::parseFile(sprintf('%s/region.yaml', Storage::path($region)));
 
+                $region_name = $names[$region_data['regionID']]['itemName'] ?? '';
+
                 $regionsData[] = [
                     'id' => $region_data['regionID'],
-                    'name' => $names[$region_data['regionID']]['itemName'] ?? '',
+                    'name' => $region_name,
                     'type' => $type_name,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
+
+                $jove_observatories_region = $jove_observatories[$region_name] ?? [];
+                $jove_observatories_region = array_flip($jove_observatories_region);
 
                 /** @var string[] $constellations */
                 $constellations = Storage::directories($region);
@@ -150,7 +156,7 @@ class SeedUniverseCommand extends BaseSeedCommand
                         $solarsystem_data = Yaml::parseFile(sprintf('%s/solarsystem.yaml', Storage::path($solarsystem)));
 
                         $name = $names[$solarsystem_data['solarSystemID']]['itemName'] ?? '';
-                        $has_jove_observatory = isset($jove_observatories[$name]);
+                        $has_jove_observatory = isset($jove_observatories_region[$name]);
 
                         $solarsystemsData[] = [
                             'id' => $solarsystem_data['solarSystemID'],
