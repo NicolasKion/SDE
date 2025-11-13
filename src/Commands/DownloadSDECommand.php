@@ -14,7 +14,7 @@ class DownloadSDECommand extends Command
 
     public function handle(): int
     {
-        $response = Http::get('https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip');
+        $response = Http::timeout(300)->get('https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip');
 
         if ($response->failed()) {
             $this->error('Failed to download SDE!');
