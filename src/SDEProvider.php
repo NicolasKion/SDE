@@ -6,7 +6,6 @@ namespace NicolasKion\SDE;
 
 use Illuminate\Support\ServiceProvider;
 use NicolasKion\SDE\Commands\DownloadSDECommand;
-use NicolasKion\SDE\Commands\PrepareSDECommand;
 use NicolasKion\SDE\Commands\Seed\SeedAttributesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedCategoriesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedEffectsCommand;
@@ -43,7 +42,6 @@ class SDEProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 DownloadSDECommand::class,
-                PrepareSDECommand::class,
                 SeedCommand::class,
                 SeedIconsCommand::class,
                 SeedUnitsCommand::class,
