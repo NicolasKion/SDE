@@ -6,12 +6,15 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type DogmaAttributeFile array<int,array{
+ * @phpstan-type DogmaAttributeFile array{
+ *     _key: int,
+ *     attributeCategoryID: int|null,
+ *     dataType: int,
  *     highIsGood: null|boolean,
- *     displayNameID: array{en: string|null},
+ *     displayName: array{en: string|null},
  *     defaultValue: null|int,
  *     iconID: int|null,
  *     published: bool|null,
@@ -19,10 +22,12 @@ use Symfony\Component\Yaml\Yaml;
  *     description: string|null,
  *     stackable: boolean|null,
  *     unitID: int|null,
- * }>
+ * }[]
  */
 class SeedAttributesCommand extends BaseSeedCommand
 {
+    protected const string ATTRIBUTES_FILE = 'sde/dogmaAttributes.jsonl';
+
     protected $signature = 'sde:seed:attributes';
 
     /**
@@ -30,25 +35,21 @@ class SeedAttributesCommand extends BaseSeedCommand
      */
     public function handle(): int
     {
-        $file_name = 'sde/fsd/dogmaAttributes.yaml';
-
-        $this->info(sprintf('Parsing attributes from %s', $file_name));
-
         /** @var DogmaAttributeFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path(self::ATTRIBUTES_FILE));
 
         $attribute_class = ClassResolver::attribute();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'high_is_good' => $item['highIsGood'] ?? false,
                 'description' => $item['description'] ?? '',
                 'default_value' => $item['defaultValue'] ?? 0,
                 'icon_id' => $item['iconID'] ?? null,
                 'published' => $item['published'] ?? false,
-                'display_name' => $item['displayNameID']['en'] ?? '',
+                'display_name' => $item['displayName']['en'] ?? '',
                 'name' => $item['name'] ?? '',
                 'stackable' => $item['stackable'] ?? false,
                 'unit_id' => $item['unitID'] ?? null,

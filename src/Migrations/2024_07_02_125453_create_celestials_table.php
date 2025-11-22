@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('constellation_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('region_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('parent_id')->nullable()->constrained('celestials')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreignId('type_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('type_id')->nullable()->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('group_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->timestamps();
         });

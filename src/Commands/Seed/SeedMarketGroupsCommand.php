@@ -8,20 +8,23 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 use Throwable;
 
 /**
- * @phpstan-type MarketGroupsFile array<int, array{
+ * @phpstan-type MarketGroupsFile array{
+ *     _key: int,
  *     parentGroupID: int|null,
- *     nameID: array{en: string|null},
- *     descriptionID: array{en: null|string},
+ *     name: array{en: string|null},
+ *     description: array{en: null|string},
  *     iconID: int|null,
  *     hasTypes: boolean|null,
- * }>
+ * }[]
  */
 class SeedMarketGroupsCommand extends BaseSeedCommand
 {
+    public const string MARKET_GROUPS_FILE = 'sde/marketGroups.jsonl';
+
     protected $signature = 'sde:seed:market-groups';
 
     /**
@@ -29,22 +32,19 @@ class SeedMarketGroupsCommand extends BaseSeedCommand
      */
     public function handle(): int
     {
-        $file_name = 'sde/fsd/marketGroups.yaml';
-
-        $this->info(sprintf('Parsing market groups from %s', $file_name));
 
         /** @var MarketGroupsFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path(self::MARKET_GROUPS_FILE));
 
         $marketGroup = ClassResolver::marketGroup();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'parent_id' => $item['parentGroupID'] ?? null,
-                'name' => $item['nameID']['en'],
-                'description' => $item['descriptionID']['en'] ?? null,
+                'name' => $item['name']['en'] ?? '',
+                'description' => $item['description']['en'] ?? '',
                 'icon_id' => $item['iconID'] ?? null,
                 'has_types' => $item['hasTypes'] ?? true,
                 'created_at' => now(),

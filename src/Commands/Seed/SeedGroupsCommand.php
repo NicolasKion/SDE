@@ -6,37 +6,36 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type GroupsFile array<int, array{
+ * @phpstan-type GroupsFile array{
+ *     _key: int,
  *     name: array{en: string|null},
  *     categoryID: int,
  *     published: boolean|null,
  *     anchorable: boolean|null,
  *     fittableNonSingleton: boolean|null,
  *     useBasePrice: boolean|null,
- * }>
+ * }[]
  */
 class SeedGroupsCommand extends BaseSeedCommand
 {
+    protected const string GROUPS_FILE = 'sde/groups.jsonl';
+
     protected $signature = 'sde:seed:groups';
 
     public function handle(): int
     {
-        $file_name = 'sde/fsd/groups.yaml';
-
-        $this->info(sprintf('Parsing groups from %s', $file_name));
-
         /** @var GroupsFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path(self::GROUPS_FILE));
 
         $group = ClassResolver::group();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'name' => $item['name']['en'],
                 'category_id' => $item['categoryID'],
                 'published' => $item['published'] ?? true,

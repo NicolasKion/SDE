@@ -6,36 +6,37 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type RacesFile array<int,array{
- *     nameID: array{en:string|null},
- *     descriptionID: array{en: string|null},
+ * @phpstan-type RacesFile array{
+ *     _key: int,
+ *     name: array{en:string|null},
+ *     description: array{en: string|null},
  *     iconID: int|null
- * }>
+ * }[]
  */
 class SeedRacesCommand extends BaseSeedCommand
 {
+    protected const string RACES_FILE = 'sde/races.jsonl';
+
     protected $signature = 'sde:seed:races';
 
     public function handle(): int
     {
-        $file_name = 'sde/fsd/races.yaml';
-
-        $this->info(sprintf('Parsing races from %s', $file_name));
+        $this->info(sprintf('Parsing races from %s', self::RACES_FILE));
 
         /** @var RacesFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path(self::RACES_FILE));
 
         $race = ClassResolver::race();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
-                'name' => $item['nameID']['en'],
-                'description' => $item['descriptionID']['en'] ?? null,
+                'id' => $item['_key'],
+                'name' => $item['name']['en'],
+                'description' => $item['description']['en'] ?? null,
                 'icon_id' => $item['iconID'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),

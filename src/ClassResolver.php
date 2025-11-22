@@ -15,7 +15,6 @@ use NicolasKion\SDE\Models\Corporation;
 use NicolasKion\SDE\Models\Effect;
 use NicolasKion\SDE\Models\EffectModifier;
 use NicolasKion\SDE\Models\Faction;
-use NicolasKion\SDE\Models\Flag;
 use NicolasKion\SDE\Models\Graphic;
 use NicolasKion\SDE\Models\Group;
 use NicolasKion\SDE\Models\Icon;
@@ -216,14 +215,6 @@ class ClassResolver
     public static function alliance(): string
     {
         return self::getClass(Alliance::class);
-    }
-
-    /**
-     * @return class-string<Flag>
-     */
-    public static function flag(): string
-    {
-        return self::getClass(Flag::class);
     }
 
     /**

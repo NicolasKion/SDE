@@ -7,16 +7,17 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 use Throwable;
 
 /**
- * @phpstan-type MetaGroupsFile array<int, array{
- *     nameID: array{en:string|null},
+ * @phpstan-type MetaGroupsFile array{
+ *     _key: int,
+ *     name: array{en:string|null},
  *     iconID: int|null,
  *     iconSuffix: string|null,
- *     descriptionID: array{en:string|null},
- * }>
+ *     description: array{en:string|null},
+ * }[]
  */
 class SeedMetaGroupsCommand extends BaseSeedCommand
 {
@@ -27,12 +28,8 @@ class SeedMetaGroupsCommand extends BaseSeedCommand
      */
     public function handle(): int
     {
-        $file_name = 'sde/fsd/metaGroups.yaml';
-
-        $this->info(sprintf('Parsing meta groups from %s', $file_name));
-
         /** @var MetaGroupsFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path('sde/metaGroups.jsonl'));
 
         $metaGroup = ClassResolver::metaGroup();
 
@@ -40,10 +37,10 @@ class SeedMetaGroupsCommand extends BaseSeedCommand
         foreach ($data as $key => $item) {
             $upsertData[] = [
                 'id' => $key,
-                'name' => $item['nameID']['en'],
+                'name' => $item['name']['en'] ?? null,
                 'icon_id' => $item['iconID'] ?? null,
                 'icon_suffix' => $item['iconSuffix'] ?? null,
-                'description' => $item['descriptionID']['en'] ?? null,
+                'description' => $item['description']['en'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];

@@ -7,10 +7,11 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type TypesFile array<int, array{
+ * @phpstan-type TypesFile array{
+ *     _key: int,
  *     name: array{en: string|null},
  *     description: array{en: string|null},
  *     groupID: int,
@@ -26,10 +27,12 @@ use Symfony\Component\Yaml\Yaml;
  *     graphicID: int|null,
  *     metaGroupID: int|null,
  *     factionID: int|null,
- * }>
+ * }[]
  */
 class SeedTypesCommand extends BaseSeedCommand
 {
+    protected const string TYPES_FILE = 'sde/types.jsonl';
+
     protected $signature = 'sde:seed:types';
 
     /**
@@ -39,19 +42,17 @@ class SeedTypesCommand extends BaseSeedCommand
     {
         $this->ensureSDEExists();
 
-        $file = 'sde/fsd/types.yaml';
-
-        $this->info(sprintf('Parsing types from %s', $file));
+        $this->info(sprintf('Parsing types from %s', self::TYPES_FILE));
 
         /** @var TypesFile $data */
-        $data = Yaml::parseFile(Storage::path($file));
+        $data = JSONL::parse(Storage::path(self::TYPES_FILE));
 
         $type = ClassResolver::type();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'name' => $item['name']['en'],
                 'description' => $item['description']['en'] ?? null,
                 'group_id' => $item['groupID'],

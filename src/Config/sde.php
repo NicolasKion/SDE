@@ -12,7 +12,6 @@ use NicolasKion\SDE\Models\Corporation;
 use NicolasKion\SDE\Models\Effect;
 use NicolasKion\SDE\Models\EffectModifier;
 use NicolasKion\SDE\Models\Faction;
-use NicolasKion\SDE\Models\Flag;
 use NicolasKion\SDE\Models\Graphic;
 use NicolasKion\SDE\Models\Group;
 use NicolasKion\SDE\Models\Icon;
@@ -50,7 +49,6 @@ return [
         'Corporation' => Corporation::class,
         'Bloodline' => Bloodline::class,
         'Faction' => Faction::class,
-        'Flag' => Flag::class,
         'Effect' => Effect::class,
         'EffectModifier' => EffectModifier::class,
         'Stargate' => Stargate::class,

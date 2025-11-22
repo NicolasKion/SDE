@@ -7,18 +7,21 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type DogmaAttributesFile array<int,array{
- *     dogmaAttributes: array<int, array{
+ * @phpstan-type DogmaAttributesFile array{
+ *     _key: int,
+ *     dogmaAttributes: array{
  *         attributeID: int,
  *         value: float,
- *     }>
- * }>
+ *     }[]
+ * }[]
  */
 class SeedTypeAttributesCommand extends BaseSeedCommand
 {
+    protected const string TYPE_DOGMA_FILE = 'sde/typeDogma.jsonl';
+
     protected $signature = 'sde:seed:type-attributes';
 
     /**
@@ -28,18 +31,17 @@ class SeedTypeAttributesCommand extends BaseSeedCommand
     {
         $this->ensureSDEExists();
 
-        $file = 'sde/fsd/typeDogma.yaml';
-
-        $this->info(sprintf('Parsing type attributes from %s', $file));
+        $this->info(sprintf('Parsing type attributes from %s', self::TYPE_DOGMA_FILE));
 
         /** @var DogmaAttributesFile $data */
-        $data = Yaml::parseFile(Storage::path($file));
+        $data = JSONL::parse(Storage::path(self::TYPE_DOGMA_FILE));
 
         $typeAttribute = ClassResolver::typeAttribute();
 
         $upsertData = [];
-        foreach ($data as $type_id => $item) {
-            foreach ($item['dogmaAttributes'] as $attribute) {
+        foreach ($data as $item) {
+            $type_id = $item['_key'];
+            foreach ($item['dogmaAttributes'] ?? [] as $attribute) {
                 $upsertData[] = [
                     'type_id' => $type_id,
                     'attribute_id' => $attribute['attributeID'],
@@ -58,7 +60,7 @@ class SeedTypeAttributesCommand extends BaseSeedCommand
             'Upserting type attributes'
         );
 
-        $this->info(sprintf('Successfully seeded %d type attributes', count($data)));
+        $this->info(sprintf('Successfully seeded %d type attributes', count($upsertData)));
 
         return self::SUCCESS;
     }

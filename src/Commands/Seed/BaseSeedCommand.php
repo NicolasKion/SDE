@@ -6,6 +6,7 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 
 use function Laravel\Prompts\progress;
@@ -28,6 +29,9 @@ abstract class BaseSeedCommand extends Command
         }
     }
 
+    /**
+     * @param  array<int,mixed>  $data
+     */
     protected function progress(string $label, int $total, callable $callback, array $data): void
     {
         $progress = progress(label: $label, steps: $total);
@@ -50,8 +54,12 @@ abstract class BaseSeedCommand extends Command
 
     /**
      * Perform chunked upsert to avoid database placeholder limits with built-in progress tracking
+     *
+     * @param  array<int,mixed>  $data
+     * @param  array<int,string>  $uniqueColumns
+     * @param  array<int,string>  $updateColumns
      */
-    protected function chunkedUpsert($query, array $data, array $uniqueColumns, array $updateColumns, ?string $label = null): void
+    protected function chunkedUpsert(Builder $query, array $data, array $uniqueColumns, array $updateColumns, ?string $label = null): void
     {
         if (empty($data)) {
             return;

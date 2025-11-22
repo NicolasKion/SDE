@@ -7,14 +7,13 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type DogmaEffectsFile array<int,array{
+ * @phpstan-type DogmaEffectsFile array{
+ *    _key: int,
  *    disallowAutoRepeat: bool,
- *    effectCategory: int,
- *    effectID: int,
- *    effectName: string,
+ *    effectCategoryID: int,
  *    electronicChance: bool,
  *    guid: string,
  *    isAssistance: bool,
@@ -23,6 +22,7 @@ use Symfony\Component\Yaml\Yaml;
  *    propulsionChance: bool,
  *    published: bool,
  *    rangeChance: bool,
+ *    name: string,
  *    dischargeAttributeID?: int,
  *    durationAttributeID?: int,
  *    distribution?: int,
@@ -36,7 +36,9 @@ use Symfony\Component\Yaml\Yaml;
  *      func: string,
  *      modifiedAttributeID: int,
  *      modifyingAttributeID: int,
- *      operation: int
+ *      operation: int,
+ *      groupID?: int,
+ *      skillTypeID?: int,
  *    }>,
  *    descriptionID?: array{
  *      de: string,
@@ -58,10 +60,12 @@ use Symfony\Component\Yaml\Yaml;
  *      ru: string,
  *      zh: string
  *    }
- * }>
+ * }[]
  */
 class SeedEffectsCommand extends BaseSeedCommand
 {
+    protected const string DOGMA_EFFECTS_FILE = 'sde/dogmaEffects.jsonl';
+
     protected $signature = 'sde:seed:effects';
 
     /**
@@ -71,12 +75,10 @@ class SeedEffectsCommand extends BaseSeedCommand
     {
         $this->ensureSDEExists();
 
-        $file = 'sde/fsd/dogmaEffects.yaml';
-
-        $this->info(sprintf('Parsing effects from %s', $file));
+        $this->info(sprintf('Parsing effects from %s', self::DOGMA_EFFECTS_FILE));
 
         /** @var DogmaEffectsFile $data */
-        $data = Yaml::parseFile(Storage::path($file));
+        $data = JSONL::parse(Storage::path(self::DOGMA_EFFECTS_FILE));
 
         $effect = ClassResolver::effect();
         $effectModifier = ClassResolver::effectModifier();
@@ -85,10 +87,10 @@ class SeedEffectsCommand extends BaseSeedCommand
         $effectsData = [];
         $modifiersData = [];
 
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $effectsData[] = [
-                'id' => $key,
-                'name' => $item['effectName'],
+                'id' => $item['_key'],
+                'name' => $item['name'],
                 'description' => $item['descriptionID']['en'] ?? null,
                 'icon_id' => $item['iconID'] ?? null,
                 'sfx_name' => $item['sfxName'] ?? null,
@@ -104,9 +106,9 @@ class SeedEffectsCommand extends BaseSeedCommand
                 'tracking_speed_attribute_id' => $item['trackingSpeedAttributeID'] ?? null,
                 'propulsion_chance' => $item['propulsionChance'] ?? false,
                 'electronic_chance' => $item['electronicChance'] ?? false,
-                'effect_category' => $item['effectCategory'] ?? null,
+                'effect_category' => $item['effectCategoryID'] ?? null,
                 'disallow_auto_repeat' => $item['disallowAutoRepeat'] ?? false,
-                'display_name' => $item['displayName'] ?? null,
+                'display_name' => $item['displayNameID']['en'] ?? null,
                 'post_expression' => $item['postExpression'] ?? null,
                 'pre_expression' => $item['preExpression'] ?? null,
                 'range_chance' => $item['rangeChance'] ?? false,
@@ -120,7 +122,7 @@ class SeedEffectsCommand extends BaseSeedCommand
             if (isset($item['modifierInfo'])) {
                 foreach ($item['modifierInfo'] as $modifier) {
                     $modifiersData[] = [
-                        'effect_id' => $key,
+                        'effect_id' => $item['_key'],
                         'domain' => $modifier['domain'] ?? null,
                         'func' => $modifier['func'] ?? null,
                         'modified_attribute_id' => $modifier['modifiedAttributeID'] ?? null,

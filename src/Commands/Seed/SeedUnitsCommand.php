@@ -4,44 +4,38 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type UnitsResponse array<int, array{
- *     displayName: string|null,
- *     description: string|null,
- *     name: string|null
+ * @phpstan-type UnitsFile array<int, array{
+ *     _key: int,
+ *     name: string,
+ *     description: array{en: string}|null,
+ *     displayName: array{en: string}|null,
  * }>
  */
 class SeedUnitsCommand extends BaseSeedCommand
 {
-    protected const string UNITS_URL = 'https://sde.hoboleaks.space/tq/dogmaunits.json';
+    protected const string UNITS_FILE = 'sde/dogmaUnits.jsonl';
 
     protected $signature = 'sde:seed:units';
 
-    /**
-     * @throws ConnectionException
-     */
     public function handle(): int
     {
-        $this->info(sprintf('Fetching units from %s', self::UNITS_URL));
-
-        $response = Http::get(self::UNITS_URL);
-
-        /** @var UnitsResponse $data */
-        $data = $response->json();
+        /** @var UnitsFile $data */
+        $data = JSONL::parse(Storage::path(self::UNITS_FILE));
 
         $unit = ClassResolver::unit();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
-                'display_name' => $item['displayName'] ?? '',
-                'description' => $item['description'] ?? '',
-                'name' => $item['name'] ?? '',
+                'id' => $item['_key'],
+                'name' => $item['name'],
+                'description' => $item['description']['en'] ?? '',
+                'display_name' => $item['displayName']['en'] ?? '',
                 'created_at' => now(),
                 'updated_at' => now(),
             ];

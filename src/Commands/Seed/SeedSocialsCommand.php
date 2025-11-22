@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
+use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
  * @phpstan-type FactionsResponse array<int, array{
@@ -23,20 +24,17 @@ use Symfony\Component\Yaml\Yaml;
  *     station_count: int,
  *     station_system_count: int,
  * }>
- * @phpstan-type CorporationsFile array<int, array{
+ * @phpstan-type CorporationsFile array{
+ *     _key: int,
  *     stationID: int|null,
  *     ceoID: int|null,
- *     creatorID: int|null,
  *     factionID: int|null,
- *     dateFounded: string|null,
- *     url: string|null,
- *     nameID: array{en: string|null},
- *     descriptionID: array{en: string|null},
- *     members: int|null,
  *     shares: int,
  *     taxRate: float,
  *     tickerName: string|null,
- * }>
+ *     name: array{en: string|null},
+ *     description: array{en: string|null},
+ * }[]
  * @phpstan-type BloodlinesResponse array<int,array{
  *     bloodline_id: int,
  *     name: string,
@@ -56,10 +54,12 @@ class SeedSocialsCommand extends BaseSeedCommand
     protected $signature = 'sde:seed:socials';
 
     /**
-     * @throws ConnectionException
+     * @throws ConnectionException|Exception
      */
     public function handle(): int
     {
+        $this->ensureSDEExists();
+
         $this->seedFactions();
 
         $this->seedCorps();
@@ -107,19 +107,22 @@ class SeedSocialsCommand extends BaseSeedCommand
         );
     }
 
+    /**
+     * @throws Exception
+     */
     private function seedCorps(): void
     {
-        $file_name = 'sde/fsd/npcCorporations.yaml';
+        $file_name = 'sde/npcCorporations.jsonl';
 
         $this->info(sprintf('Parsing corporations from %s', $file_name));
 
         /** @var CorporationsFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path($file_name));
 
         $corp = ClassResolver::corporation();
 
         /** @var int[] $char_ids */
-        $char_ids = collect($data)->values()->pluck('ceoID')->unique()->whereNotNull()->all();
+        $char_ids = collect($data)->pluck('ceoID')->unique()->whereNotNull()->all();
 
         $char = ClassResolver::character();
 
@@ -130,19 +133,19 @@ class SeedSocialsCommand extends BaseSeedCommand
         // For corporations, we need to handle station lookups, so we'll keep individual processing
         // but collect data for bulk upsert
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $stationData = $station::query()->find($item['stationID'] ?? null);
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'ceo_id' => $item['ceoID'] ?? null,
                 'creator_id' => null,
                 'home_station_id' => $stationData->id ?? null,
                 'faction_id' => $item['factionID'] ?? null,
-                'date_founded' => $item['dateFounded'] ?? null,
-                'url' => $item['url'] ?? null,
-                'name' => $item['nameID']['en'],
-                'description' => $item['descriptionID']['en'] ?? null,
-                'member_count' => $item['members'] ?? null,
+                'date_founded' => null, // Not in JSONL format
+                'url' => null, // Not in JSONL format
+                'name' => $item['name']['en'],
+                'description' => $item['description']['en'] ?? null,
+                'member_count' => null, // Not in JSONL format
                 'npc' => true,
                 'shares' => $item['shares'],
                 'tax_rate' => $item['taxRate'],

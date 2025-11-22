@@ -7,16 +7,18 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type IconsFile array<int, array{
+ * @phpstan-type IconsFile array{
+ *     _key: int,
  *     iconFile: string,
- *     description: string|null,
- * }>
+ * }[]
  */
 class SeedIconsCommand extends BaseSeedCommand
 {
+    protected const string ICONS_FILE = 'sde/icons.jsonl';
+
     protected $signature = 'sde:seed:icons';
 
     /**
@@ -26,21 +28,16 @@ class SeedIconsCommand extends BaseSeedCommand
     {
         $this->ensureSDEExists();
 
-        $icon_file = 'sde/fsd/iconIDs.yaml';
-
-        $this->info(sprintf('Parsing icons from %s', $icon_file));
-
         /** @var IconsFile $data */
-        $data = Yaml::parseFile(Storage::path($icon_file));
+        $data = JSONL::parse(Storage::path(self::ICONS_FILE));
 
         $icon = ClassResolver::icon();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'file' => $item['iconFile'],
-                'description' => $item['description'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -50,7 +47,7 @@ class SeedIconsCommand extends BaseSeedCommand
             $icon::query(),
             $upsertData,
             ['id'],
-            ['file', 'description', 'updated_at']
+            ['file', 'updated_at']
         );
 
         $this->info(sprintf('Successfully seeded %d icons', count($data)));

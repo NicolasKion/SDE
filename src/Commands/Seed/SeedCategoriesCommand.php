@@ -6,33 +6,32 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
-use Symfony\Component\Yaml\Yaml;
+use NicolasKion\SDE\Support\JSONL;
 
 /**
- * @phpstan-type CategoryFile array<int, array{
+ * @phpstan-type CategoryFile array{
+ *     _key: int,
  *     name: array{en:string|null},
  *     published: boolean|null,
- * }>
+ * }[]
  */
 class SeedCategoriesCommand extends BaseSeedCommand
 {
+    protected const string CATEGORIES_FILE = 'sde/categories.jsonl';
+
     protected $signature = 'sde:seed:categories';
 
     public function handle(): int
     {
-        $file_name = 'sde/fsd/categories.yaml';
-
-        $this->info(sprintf('Parsing categories from %s', $file_name));
-
         /** @var CategoryFile $data */
-        $data = Yaml::parseFile(Storage::path($file_name));
+        $data = JSONL::parse(Storage::path(self::CATEGORIES_FILE));
 
         $category = ClassResolver::category();
 
         $upsertData = [];
-        foreach ($data as $key => $item) {
+        foreach ($data as $item) {
             $upsertData[] = [
-                'id' => $key,
+                'id' => $item['_key'],
                 'name' => $item['name']['en'],
                 'published' => $item['published'] ?? true,
                 'created_at' => now(),
