@@ -14,7 +14,7 @@ final readonly class EffectDto
         public bool $disallowAutoRepeat,
         public int $effectCategoryId,
         public bool $electronicChance,
-        public string $guid,
+        public ?string $guid,
         public bool $isAssistance,
         public bool $isOffensive,
         public bool $isWarpSafe,
@@ -29,18 +29,17 @@ final readonly class EffectDto
         public ?int $rangeAttributeId,
         public ?int $trackingSpeedAttributeId,
         public ?int $iconId,
-        public ?string $sfxName,
         public array $modifierInfo,
         public ?string $description,
         public ?string $displayName,
-        public ?int $postExpression,
-        public ?int $preExpression,
         public ?int $fittingUsageChanceAttributeId,
         public ?int $resistanceAttributeId,
+        public ?int $npcActivationChanceAttributeId,
+        public ?int $npcUsageChanceAttributeId,
     ) {}
 
     /**
-     * @param  array{_key: int, disallowAutoRepeat: bool, effectCategoryID: int, electronicChance: bool, guid: string, isAssistance: bool, isOffensive: bool, isWarpSafe: bool, propulsionChance: bool, published: bool, rangeChance: bool, name: string, dischargeAttributeID?: int, durationAttributeID?: int, distribution?: int, falloffAttributeID?: int, rangeAttributeID?: int, trackingSpeedAttributeID?: int, iconID?: int, sfxName?: string, modifierInfo?: list<array{domain: string, func: string, modifiedAttributeID: int, modifyingAttributeID: int, operation: int, groupID?: int, skillTypeID?: int}>, descriptionID?: array{en: string}, displayNameID?: array{en: string}, postExpression?: int, preExpression?: int, fittingUsageChanceAttributeID?: int, resistanceAttributeID?: int}  $data
+     * @param  array{_key: int, disallowAutoRepeat: bool, effectCategoryID: int, electronicChance: bool, guid?: string, isAssistance: bool, isOffensive: bool, isWarpSafe: bool, propulsionChance: bool, published: bool, rangeChance: bool, name: string, dischargeAttributeID?: int, durationAttributeID?: int, distribution?: int, falloffAttributeID?: int, rangeAttributeID?: int, trackingSpeedAttributeID?: int, iconID?: int, modifierInfo?: list<array{domain: string, func: string, modifiedAttributeID?: int, modifyingAttributeID?: int, operation?: int, groupID?: int, skillTypeID?: int, effectID?: int}>, description?: array{en?: string}, displayName?: array{en?: string}, fittingUsageChanceAttributeID?: int, resistanceAttributeID?: int, npcActivationChanceAttributeID?: int, npcUsageChanceAttributeID?: int}  $data
      */
     public static function fromArray(array $data): self
     {
@@ -54,7 +53,7 @@ final readonly class EffectDto
             disallowAutoRepeat: $data['disallowAutoRepeat'],
             effectCategoryId: $data['effectCategoryID'],
             electronicChance: $data['electronicChance'],
-            guid: $data['guid'],
+            guid: $data['guid'] ?? null,
             isAssistance: $data['isAssistance'],
             isOffensive: $data['isOffensive'],
             isWarpSafe: $data['isWarpSafe'],
@@ -69,14 +68,13 @@ final readonly class EffectDto
             rangeAttributeId: $data['rangeAttributeID'] ?? null,
             trackingSpeedAttributeId: $data['trackingSpeedAttributeID'] ?? null,
             iconId: $data['iconID'] ?? null,
-            sfxName: $data['sfxName'] ?? null,
             modifierInfo: $modifiers,
-            description: $data['descriptionID']['en'] ?? null,
-            displayName: $data['displayNameID']['en'] ?? null,
-            postExpression: $data['postExpression'] ?? null,
-            preExpression: $data['preExpression'] ?? null,
+            description: $data['description']['en'] ?? null,
+            displayName: $data['displayName']['en'] ?? null,
             fittingUsageChanceAttributeId: $data['fittingUsageChanceAttributeID'] ?? null,
             resistanceAttributeId: $data['resistanceAttributeID'] ?? null,
+            npcActivationChanceAttributeId: $data['npcActivationChanceAttributeID'] ?? null,
+            npcUsageChanceAttributeId: $data['npcUsageChanceAttributeID'] ?? null,
         );
     }
 }

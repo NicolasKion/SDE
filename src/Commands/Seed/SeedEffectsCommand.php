@@ -39,10 +39,9 @@ class SeedEffectsCommand extends BaseSeedCommand
      */
     private function processEffects(): int
     {
-        $effect = ClassResolver::effect();
-        $effectModifier = ClassResolver::effectModifier();
+        $effectModel = ClassResolver::effect();
+        $effectModifierModel = ClassResolver::effectModifier();
 
-        $count = 0;
         $effectsBuffer = [];
         $modifiersBuffer = [];
         $count = 0;
@@ -54,14 +53,12 @@ class SeedEffectsCommand extends BaseSeedCommand
                 'name' => $effect->name,
                 'description' => $effect->description,
                 'icon_id' => $effect->iconId,
-                'sfx_name' => $effect->sfxName,
                 'published' => $effect->published,
                 'is_assistance' => $effect->isAssistance,
                 'is_offensive' => $effect->isOffensive,
                 'is_warp_safe' => $effect->isWarpSafe,
                 'discharge_attribute_id' => $effect->dischargeAttributeId,
                 'duration_attribute_id' => $effect->durationAttributeId,
-                'distribution' => $effect->distribution,
                 'falloff_attribute_id' => $effect->falloffAttributeId,
                 'range_attribute_id' => $effect->rangeAttributeId,
                 'tracking_speed_attribute_id' => $effect->trackingSpeedAttributeId,
@@ -70,8 +67,6 @@ class SeedEffectsCommand extends BaseSeedCommand
                 'effect_category' => $effect->effectCategoryId,
                 'disallow_auto_repeat' => $effect->disallowAutoRepeat,
                 'display_name' => $effect->displayName,
-                'post_expression' => $effect->postExpression,
-                'pre_expression' => $effect->preExpression,
                 'range_chance' => $effect->rangeChance,
                 'fitting_usage_chance_attribute_id' => $effect->fittingUsageChanceAttributeId,
                 'resistance_attribute_id' => $effect->resistanceAttributeId,
@@ -99,15 +94,15 @@ class SeedEffectsCommand extends BaseSeedCommand
 
             // Flush buffers when chunk size is reached
             if (count($effectsBuffer) >= self::UPSERT_CHUNK_SIZE) {
-                DB::transaction(function () use ($effect, $effectModifier, &$effectsBuffer, &$modifiersBuffer) {
-                    $effect::upsert(
+                DB::transaction(function () use ($effectModel, $effectModifierModel, &$effectsBuffer, &$modifiersBuffer) {
+                    $effectModel::upsert(
                         $effectsBuffer,
                         ['id'],
-                        ['name', 'description', 'icon_id', 'sfx_name', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'distribution', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'post_expression', 'pre_expression', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
+                        ['name', 'description', 'icon_id', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
                     );
 
                     if (! empty($modifiersBuffer)) {
-                        $effectModifier::upsert(
+                        $effectModifierModel::upsert(
                             $modifiersBuffer,
                             ['effect_id', 'domain', 'func', 'modified_attribute_id', 'modifying_attribute_id'],
                             ['operator', 'group_id', 'skill_type_id', 'updated_at']
@@ -122,15 +117,15 @@ class SeedEffectsCommand extends BaseSeedCommand
 
         // Flush remaining effects and modifiers
         if (! empty($effectsBuffer)) {
-            DB::transaction(function () use ($effect, $effectModifier, $effectsBuffer, $modifiersBuffer) {
-                $effect::upsert(
+            DB::transaction(function () use ($effectModel, $effectModifierModel, $effectsBuffer, $modifiersBuffer) {
+                $effectModel::upsert(
                     $effectsBuffer,
                     ['id'],
-                    ['name', 'description', 'icon_id', 'sfx_name', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'distribution', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'post_expression', 'pre_expression', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
+                    ['name', 'description', 'icon_id', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
                 );
 
                 if (! empty($modifiersBuffer)) {
-                    $effectModifier::upsert(
+                    $effectModifierModel::upsert(
                         $modifiersBuffer,
                         ['effect_id', 'domain', 'func', 'modified_attribute_id', 'modifying_attribute_id'],
                         ['operator', 'group_id', 'skill_type_id', 'updated_at']
