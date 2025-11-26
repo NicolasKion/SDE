@@ -17,6 +17,7 @@ use NicolasKion\SDE\Commands\Seed\SeedMetaGroupsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedRacesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedSocialsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedTypeAttributesCommand;
+use NicolasKion\SDE\Commands\Seed\SeedTypeEffectsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedTypesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedUnitsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedUniverseCommand;
@@ -53,6 +54,7 @@ class SDEProvider extends ServiceProvider
                 SeedRacesCommand::class,
                 SeedTypesCommand::class,
                 SeedTypeAttributesCommand::class,
+                SeedTypeEffectsCommand::class,
                 SeedUniverseCommand::class,
                 SeedSocialsCommand::class,
                 SeedEffectsCommand::class,

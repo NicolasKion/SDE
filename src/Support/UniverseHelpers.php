@@ -70,6 +70,24 @@ class UniverseHelpers
     }
 
     /**
+     * Generate star name.
+     * Based on: https://developers.eveonline.com/docs/services/static-data/#celestial-names
+     */
+    public static function generateStarName(string $solarSystemName): string
+    {
+        return $solarSystemName;
+    }
+
+    /**
+     * Generate planet name.
+     * Format: <orbitName> <celestialIndex>
+     */
+    public static function generatePlanetName(string $orbitName, int $celestialIndex): string
+    {
+        return sprintf('%s %s', $orbitName, self::toRoman($celestialIndex));
+    }
+
+    /**
      * Convert number to Roman numerals.
      */
     private static function toRoman(int $number): string
@@ -88,24 +106,6 @@ class UniverseHelpers
         }
 
         return $result;
-    }
-
-    /**
-     * Generate star name.
-     * Based on: https://developers.eveonline.com/docs/services/static-data/#celestial-names
-     */
-    public static function generateStarName(string $solarSystemName): string
-    {
-        return $solarSystemName;
-    }
-
-    /**
-     * Generate planet name.
-     * Format: <orbitName> <celestialIndex>
-     */
-    public static function generatePlanetName(string $orbitName, int $celestialIndex): string
-    {
-        return sprintf('%s %s', $orbitName, self::toRoman($celestialIndex));
     }
 
     /**
@@ -132,16 +132,24 @@ class UniverseHelpers
      * Based on: https://developers.eveonline.com/docs/services/static-data/#celestial-names
      */
     public static function generateStationName(
-        string $orbitName,
+        ?string $orbitName,
         string $corporationName,
         ?string $operationName = null,
         bool $useOperationName = false
     ): string {
-        if ($useOperationName && $operationName !== null) {
-            return sprintf('%s - %s %s', $orbitName, $corporationName, $operationName);
+
+        $name = '';
+
+        if ($orbitName !== null) {
+            $name = "$orbitName -";
         }
 
-        return sprintf('%s - %s', $orbitName, $corporationName);
+        if ($useOperationName && $operationName !== null) {
+            return "$orbitName $corporationName $operationName";
+        }
+
+        return "$name $corporationName";
+
     }
 
     /**

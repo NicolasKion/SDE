@@ -6,6 +6,7 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\RaceDto;
 use NicolasKion\SDE\Support\JSONL;
 
 /**
@@ -24,33 +25,29 @@ class SeedRacesCommand extends BaseSeedCommand
 
     public function handle(): int
     {
-        $this->info(sprintf('Parsing races from %s', self::RACES_FILE));
-
-        /** @var RacesFile $data */
-        $data = JSONL::parse(Storage::path(self::RACES_FILE));
+        $this->startMemoryTracking();
 
         $race = ClassResolver::race();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'name' => $item['name']['en'],
-                'description' => $item['description']['en'] ?? null,
-                'icon_id' => $item['iconID'] ?? null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        $this->chunkedUpsert(
+        $count = $this->streamUpsert(
             $race::query(),
-            $upsertData,
+            JSONL::lazy(Storage::path(self::RACES_FILE), RaceDto::class),
+            function (RaceDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->name,
+                    'description' => $dto->description,
+                    'icon_id' => $dto->iconId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
             ['id'],
-            ['name', 'description', 'icon_id', 'updated_at']
+            ['name', 'description', 'icon_id', 'updated_at'],
+            'Seeding Races'
         );
 
-        $this->info(sprintf('Successfully seeded %d races', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

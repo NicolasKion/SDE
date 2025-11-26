@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\MetaGroupDto;
 use NicolasKion\SDE\Support\JSONL;
 use Throwable;
 
@@ -28,34 +28,30 @@ class SeedMetaGroupsCommand extends BaseSeedCommand
      */
     public function handle(): int
     {
-        /** @var MetaGroupsFile $data */
-        $data = JSONL::parse(Storage::path('sde/metaGroups.jsonl'));
+        $this->startMemoryTracking();
 
         $metaGroup = ClassResolver::metaGroup();
 
-        $upsertData = [];
-        foreach ($data as $key => $item) {
-            $upsertData[] = [
-                'id' => $key,
-                'name' => $item['name']['en'] ?? null,
-                'icon_id' => $item['iconID'] ?? null,
-                'icon_suffix' => $item['iconSuffix'] ?? null,
-                'description' => $item['description']['en'] ?? null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
+        $count = $this->streamUpsert(
+            $metaGroup::query(),
+            JSONL::lazy(Storage::path('sde/metaGroups.jsonl'), MetaGroupDto::class),
+            function (MetaGroupDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->name,
+                    'icon_id' => $dto->iconId,
+                    'icon_suffix' => $dto->iconSuffix,
+                    'description' => $dto->description,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
+            ['id'],
+            ['name', 'icon_id', 'icon_suffix', 'description', 'updated_at'],
+            'Seeding Meta Groups'
+        );
 
-        DB::transaction(function () use ($upsertData, $metaGroup) {
-            $this->chunkedUpsert(
-                $metaGroup::query(),
-                $upsertData,
-                ['id'],
-                ['name', 'icon_id', 'icon_suffix', 'description', 'updated_at']
-            );
-        });
-
-        $this->info(sprintf('Successfully seeded %d meta groups', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

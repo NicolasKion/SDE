@@ -6,6 +6,7 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\CategoryDto;
 use NicolasKion\SDE\Support\JSONL;
 
 /**
@@ -23,30 +24,28 @@ class SeedCategoriesCommand extends BaseSeedCommand
 
     public function handle(): int
     {
-        /** @var CategoryFile $data */
-        $data = JSONL::parse(Storage::path(self::CATEGORIES_FILE));
+        $this->startMemoryTracking();
 
         $category = ClassResolver::category();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'name' => $item['name']['en'],
-                'published' => $item['published'] ?? true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        $this->chunkedUpsert(
+        $count = $this->streamUpsert(
             $category::query(),
-            $upsertData,
+            JSONL::lazy(Storage::path(self::CATEGORIES_FILE), CategoryDto::class),
+            function (CategoryDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->name,
+                    'published' => $dto->published,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
             ['id'],
-            ['name', 'published', 'updated_at']
+            ['name', 'published', 'updated_at'],
+            'Seeding Categories'
         );
 
-        $this->info(sprintf('Successfully seeded %d categories', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

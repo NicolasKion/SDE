@@ -9,7 +9,10 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\CorporationDto;
 use NicolasKion\SDE\Support\JSONL;
+
+use function Laravel\Prompts\spin;
 
 /**
  * @phpstan-type FactionsResponse array<int, array{
@@ -59,23 +62,31 @@ class SeedSocialsCommand extends BaseSeedCommand
     public function handle(): int
     {
         $this->ensureSDEExists();
+        $this->startMemoryTracking();
 
-        $this->seedFactions();
+        $factionCount = $this->seedFactions();
+        $corpCount = $this->seedCorps();
+        $bloodlineCount = $this->seedBloodlines();
 
-        $this->seedCorps();
+        $totalCount = $factionCount + $corpCount + $bloodlineCount;
 
-        $this->seedBloodlines();
+        $this->displayMemoryStats($totalCount);
 
         return self::SUCCESS;
     }
 
+    private function seedFactions(): int
+    {
+        return spin(fn () => $this->fetchAndSeedFactions(), 'Fetching and seeding factions from ESI API');
+    }
+
     /**
+     * Fetch factions from ESI and seed them
+     *
      * @throws ConnectionException
      */
-    private function seedFactions(): void
+    private function fetchAndSeedFactions(): int
     {
-        $this->info('Fetching factions from ESI API');
-
         /** @var FactionsResponse $factionEsi */
         $factionEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/factions/')->json();
 
@@ -103,54 +114,61 @@ class SeedSocialsCommand extends BaseSeedCommand
             $faction::query(),
             $upsertData,
             ['id'],
-            ['name', 'description', 'corporation_id', 'is_unique', 'militia_corporation_id', 'size_factor', 'solarsystem_id', 'station_count', 'station_system_count', 'updated_at']
+            ['name', 'description', 'corporation_id', 'is_unique', 'militia_corporation_id', 'size_factor', 'solarsystem_id', 'station_count', 'station_system_count', 'updated_at'],
+            'Seeding Factions'
         );
+
+        return count($upsertData);
     }
 
     /**
      * @throws Exception
      */
-    private function seedCorps(): void
+    private function seedCorps(): int
     {
-        $file_name = 'sde/npcCorporations.jsonl';
+        return spin(fn () => $this->processCorporations(), 'Processing corporations from SDE');
+    }
 
-        $this->info(sprintf('Parsing corporations from %s', $file_name));
-
-        /** @var CorporationsFile $data */
-        $data = JSONL::parse(Storage::path($file_name));
-
+    /**
+     * Process corporations from SDE file
+     */
+    private function processCorporations(): int
+    {
         $corp = ClassResolver::corporation();
-
-        /** @var int[] $char_ids */
-        $char_ids = collect($data)->pluck('ceoID')->unique()->whereNotNull()->all();
-
         $char = ClassResolver::character();
-
         $station = ClassResolver::station();
 
-        $char::createFromIds($char_ids);
+        // First pass: collect CEO IDs
+        $char_ids = [];
+        foreach (JSONL::lazy(Storage::path('sde/npcCorporations.jsonl'), CorporationDto::class) as $dto) {
+            if ($dto->ceoId !== null) {
+                $char_ids[] = $dto->ceoId;
+            }
+        }
 
-        // For corporations, we need to handle station lookups, so we'll keep individual processing
-        // but collect data for bulk upsert
+        // Create characters for CEOs
+        $char::createFromIds(array_unique($char_ids));
+
+        // Second pass: create corporations
         $upsertData = [];
-        foreach ($data as $item) {
-            $stationData = $station::query()->find($item['stationID'] ?? null);
+        foreach (JSONL::lazy(Storage::path('sde/npcCorporations.jsonl'), CorporationDto::class) as $dto) {
+            $stationData = $station::query()->find($dto->stationId);
             $upsertData[] = [
-                'id' => $item['_key'],
-                'ceo_id' => $item['ceoID'] ?? null,
+                'id' => $dto->id,
+                'ceo_id' => $dto->ceoId,
                 'creator_id' => null,
                 'home_station_id' => $stationData->id ?? null,
-                'faction_id' => $item['factionID'] ?? null,
-                'date_founded' => null, // Not in JSONL format
-                'url' => null, // Not in JSONL format
-                'name' => $item['name']['en'],
-                'description' => $item['description']['en'] ?? null,
-                'member_count' => null, // Not in JSONL format
+                'faction_id' => $dto->factionId,
+                'date_founded' => null,
+                'url' => null,
+                'name' => $dto->name,
+                'description' => $dto->description,
+                'member_count' => null,
                 'npc' => true,
-                'shares' => $item['shares'],
-                'tax_rate' => $item['taxRate'],
+                'shares' => $dto->shares,
+                'tax_rate' => $dto->taxRate,
                 'war_eligible' => false,
-                'ticker' => $item['tickerName'] ?? null,
+                'ticker' => $dto->tickerName,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -160,17 +178,25 @@ class SeedSocialsCommand extends BaseSeedCommand
             $corp::query(),
             $upsertData,
             ['id'],
-            ['ceo_id', 'creator_id', 'home_station_id', 'faction_id', 'date_founded', 'url', 'name', 'description', 'member_count', 'npc', 'shares', 'tax_rate', 'war_eligible', 'ticker', 'updated_at']
+            ['ceo_id', 'creator_id', 'home_station_id', 'faction_id', 'date_founded', 'url', 'name', 'description', 'member_count', 'npc', 'shares', 'tax_rate', 'war_eligible', 'ticker', 'updated_at'],
+            'Seeding Corporations'
         );
+
+        return count($upsertData);
+    }
+
+    private function seedBloodlines(): int
+    {
+        return spin(fn () => $this->fetchAndSeedBloodlines(), 'Fetching and seeding bloodlines from ESI API');
     }
 
     /**
+     * Fetch bloodlines from ESI and seed them
+     *
      * @throws ConnectionException
      */
-    private function seedBloodlines(): void
+    private function fetchAndSeedBloodlines(): int
     {
-        $this->info('Fetching bloodlines from ESI API');
-
         /** @var BloodlinesResponse $bloodlinesEsi */
         $bloodlinesEsi = Http::retry(5)->get('https://esi.evetech.net/latest/universe/bloodlines/')->json();
 
@@ -199,7 +225,10 @@ class SeedSocialsCommand extends BaseSeedCommand
             $bloodline::query(),
             $upsertData,
             ['id'],
-            ['name', 'description', 'corporation_id', 'ship_type_id', 'race_id', 'intelligence', 'charisma', 'perception', 'memory', 'willpower', 'updated_at']
+            ['name', 'description', 'corporation_id', 'ship_type_id', 'race_id', 'intelligence', 'charisma', 'perception', 'memory', 'willpower', 'updated_at'],
+            'Seeding Bloodlines'
         );
+
+        return count($upsertData);
     }
 }

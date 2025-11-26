@@ -6,6 +6,7 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\GroupDto;
 use NicolasKion\SDE\Support\JSONL;
 
 /**
@@ -27,34 +28,32 @@ class SeedGroupsCommand extends BaseSeedCommand
 
     public function handle(): int
     {
-        /** @var GroupsFile $data */
-        $data = JSONL::parse(Storage::path(self::GROUPS_FILE));
+        $this->startMemoryTracking();
 
         $group = ClassResolver::group();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'name' => $item['name']['en'],
-                'category_id' => $item['categoryID'],
-                'published' => $item['published'] ?? true,
-                'anchorable' => $item['anchorable'] ?? false,
-                'fittable_non_singleton' => $item['fittableNonSingleton'] ?? false,
-                'use_base_price' => $item['useBasePrice'] ?? false,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        $this->chunkedUpsert(
+        $count = $this->streamUpsert(
             $group::query(),
-            $upsertData,
+            JSONL::lazy(Storage::path(self::GROUPS_FILE), GroupDto::class),
+            function (GroupDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->name,
+                    'category_id' => $dto->categoryId,
+                    'published' => $dto->published,
+                    'anchorable' => $dto->anchorable,
+                    'fittable_non_singleton' => $dto->fittableNonSingleton,
+                    'use_base_price' => $dto->useBasePrice,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
             ['id'],
-            ['name', 'category_id', 'published', 'anchorable', 'fittable_non_singleton', 'use_base_price', 'updated_at']
+            ['name', 'category_id', 'published', 'anchorable', 'fittable_non_singleton', 'use_base_price', 'updated_at'],
+            'Seeding Groups'
         );
 
-        $this->info(sprintf('Successfully seeded %d groups', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

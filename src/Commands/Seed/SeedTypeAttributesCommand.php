@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
 use NicolasKion\SDE\Support\JSONL;
 
+use function Laravel\Prompts\spin;
+
 /**
  * @phpstan-type DogmaAttributesFile array{
  *     _key: int,
@@ -30,16 +32,27 @@ class SeedTypeAttributesCommand extends BaseSeedCommand
     public function handle(): int
     {
         $this->ensureSDEExists();
+        $this->startMemoryTracking();
 
-        $this->info(sprintf('Parsing type attributes from %s', self::TYPE_DOGMA_FILE));
+        $count = spin(fn () => $this->processTypeAttributes(), 'Seeding Type Attributes');
 
-        /** @var DogmaAttributesFile $data */
-        $data = JSONL::parse(Storage::path(self::TYPE_DOGMA_FILE));
+        $this->displayMemoryStats($count);
 
+        return self::SUCCESS;
+    }
+
+    /**
+     * Process type attributes from JSONL file
+     */
+    private function processTypeAttributes(): int
+    {
         $typeAttribute = ClassResolver::typeAttribute();
-
         $upsertData = [];
-        foreach ($data as $item) {
+        $count = 0;
+
+        // Process type-attribute relationships
+        // Each type can have multiple dogma attributes
+        foreach (JSONL::lazy(Storage::path(self::TYPE_DOGMA_FILE)) as $item) {
             $type_id = $item['_key'];
             foreach ($item['dogmaAttributes'] ?? [] as $attribute) {
                 $upsertData[] = [
@@ -49,19 +62,30 @@ class SeedTypeAttributesCommand extends BaseSeedCommand
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
+                $count++;
+            }
+
+            // Flush buffer when chunk size is reached
+            if (count($upsertData) >= self::UPSERT_CHUNK_SIZE) {
+                $typeAttribute::upsert(
+                    $upsertData,
+                    ['type_id', 'attribute_id'],
+                    ['value', 'updated_at']
+                );
+
+                $upsertData = [];
             }
         }
 
-        $this->chunkedUpsert(
-            $typeAttribute::query(),
-            $upsertData,
-            ['type_id', 'attribute_id'],
-            ['value', 'updated_at'],
-            'Upserting type attributes'
-        );
+        // Flush remaining attributes
+        if (! empty($upsertData)) {
+            $typeAttribute::upsert(
+                $upsertData,
+                ['type_id', 'attribute_id'],
+                ['value', 'updated_at']
+            );
+        }
 
-        $this->info(sprintf('Successfully seeded %d type attributes', count($upsertData)));
-
-        return self::SUCCESS;
+        return $count;
     }
 }

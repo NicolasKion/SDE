@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
+use Exception;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\GraphicDto;
 use NicolasKion\SDE\Support\JSONL;
 
 /**
@@ -23,34 +25,36 @@ class SeedGraphicsCommand extends BaseSeedCommand
 
     protected $signature = 'sde:seed:graphics';
 
+    /**
+     * @throws Exception
+     */
     public function handle(): int
     {
-        /** @var GraphicsFile $data */
-        $data = JSONL::parse(Storage::path(self::GRAPHICS_FILE));
+        $this->ensureSDEExists();
+        $this->startMemoryTracking();
 
         $graphic = ClassResolver::graphic();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'file' => $item['iconFolder'] ?? null,
-                'sof_faction_name' => $item['sofFactionName'] ?? null,
-                'sof_hull_name' => $item['sofHullName'] ?? null,
-                'sof_race_name' => $item['sofRaceName'] ?? null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        $this->chunkedUpsert(
+        $count = $this->streamUpsert(
             $graphic::query(),
-            $upsertData,
+            JSONL::lazy(Storage::path(self::GRAPHICS_FILE), GraphicDto::class),
+            function (GraphicDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'file' => $dto->file,
+                    'sof_faction_name' => $dto->sofFactionName,
+                    'sof_hull_name' => $dto->sofHullName,
+                    'sof_race_name' => $dto->sofRaceName,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
             ['id'],
-            ['file', 'sof_faction_name', 'sof_hull_name', 'sof_race_name', 'updated_at']
+            ['file', 'sof_faction_name', 'sof_hull_name', 'sof_race_name', 'updated_at'],
+            'Seeding Graphics'
         );
 
-        $this->info(sprintf('Successfully seeded %d graphics', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

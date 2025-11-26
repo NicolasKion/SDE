@@ -5,10 +5,23 @@ declare(strict_types=1);
 namespace NicolasKion\SDE\Commands\Seed;
 
 use Exception;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\AsteroidBeltDto;
+use NicolasKion\SDE\Data\Dto\ConstellationDto;
+use NicolasKion\SDE\Data\Dto\CorporationDto;
+use NicolasKion\SDE\Data\Dto\MoonDto;
+use NicolasKion\SDE\Data\Dto\PlanetDto;
+use NicolasKion\SDE\Data\Dto\RegionDto;
+use NicolasKion\SDE\Data\Dto\SolarsystemDto;
+use NicolasKion\SDE\Data\Dto\StarDto;
+use NicolasKion\SDE\Data\Dto\StargateDto;
+use NicolasKion\SDE\Data\Dto\StationDto;
+use NicolasKion\SDE\Data\Dto\StationOperationDto;
 use NicolasKion\SDE\Models\SolarsystemConnection;
 use NicolasKion\SDE\Models\Stargate;
 use NicolasKion\SDE\Support\JSONL;
@@ -17,6 +30,7 @@ use Throwable;
 
 use function array_flip;
 use function collect;
+use function Laravel\Prompts\spin;
 
 /**
  * @phpstan-type RegionData array{
@@ -102,431 +116,613 @@ class SeedUniverseCommand extends BaseSeedCommand
     public function handle(): int
     {
         $this->ensureSDEExists();
+        $this->startMemoryTracking();
 
-        $this->info('Loading universe data from JSONL files...');
+        // Seed each entity type in hierarchical order
+        // Each method handles its own scope and memory cleanup
+        $regionCount = $this->seedRegions();
+        $this->logMemoryUsage('Regions Complete');
 
-        // Load all JSONL files
-        /** @var RegionData[] $regionsData */
-        $regionsData = JSONL::parse(Storage::path('sde/mapRegions.jsonl'));
+        $constellationCount = $this->seedConstellations();
+        $this->logMemoryUsage('Constellations Complete');
 
-        /** @var ConstellationData[] $constellationsData */
-        $constellationsData = JSONL::parse(Storage::path('sde/mapConstellations.jsonl'));
+        $solarsystemsLookup = $this->seedSolarsystems();
+        $this->logMemoryUsage('Solarsystems Complete');
 
-        /** @var SolarsystemData[] $solarsystemsData */
-        $solarsystemsData = JSONL::parse(Storage::path('sde/mapSolarSystems.jsonl'));
+        $starCount = $this->seedStars($solarsystemsLookup);
+        $this->logMemoryUsage('Stars Complete');
 
-        /** @var PlanetData[] $planetsData */
-        $planetsData = JSONL::parse(Storage::path('sde/mapPlanets.jsonl'));
+        $planetsLookup = $this->seedPlanets($solarsystemsLookup);
+        $this->logMemoryUsage('Planets Complete');
 
-        /** @var MoonData[] $moonsData */
-        $moonsData = JSONL::parse(Storage::path('sde/mapMoons.jsonl'));
+        $moonsLookup = $this->seedMoons($solarsystemsLookup, $planetsLookup);
+        $this->logMemoryUsage('Moons Complete');
 
-        /** @var AsteroidBeltData[] $asteroidBeltsData */
-        $asteroidBeltsData = JSONL::parse(Storage::path('sde/mapAsteroidBelts.jsonl'));
+        $beltCount = $this->seedAsteroidBelts($solarsystemsLookup, $planetsLookup);
+        $this->logMemoryUsage('Asteroid Belts Complete');
 
-        /** @var StarData[] $starsData */
-        $starsData = JSONL::parse(Storage::path('sde/mapStars.jsonl'));
+        $stationCount = $this->seedStations($solarsystemsLookup, $planetsLookup, $moonsLookup);
+        $this->logMemoryUsage('Stations Complete');
 
-        /** @var StationData[] $stationsData */
-        $stationsData = JSONL::parse(Storage::path('sde/npcStations.jsonl'));
+        [$stargateCount, $connectionCount] = $this->seedStargatesAndConnections($solarsystemsLookup);
+        $this->logMemoryUsage('Stargates Complete');
 
-        /** @var StargateData[] $stargatesData */
-        $stargatesData = JSONL::parse(Storage::path('sde/mapStargates.jsonl'));
+        $totalRecords = $regionCount + $constellationCount + count($solarsystemsLookup) +
+                        $starCount + count($planetsLookup) + count($moonsLookup) +
+                        $beltCount + $stationCount + $stargateCount + $connectionCount;
 
-        /** @var StationOperationData[] $stationOperationsData */
-        $stationOperationsData = JSONL::parse(Storage::path('sde/stationOperations.jsonl'));
+        $this->displayMemoryStats($totalRecords);
 
-        // Load corporation names
-        $corporationsData = JSONL::parse(Storage::path('sde/npcCorporations.jsonl'));
-        $corporationNames = collect($corporationsData)->keyBy('_key')->map(fn ($corp) => $corp['name']['en'] ?? '');
+        return self::SUCCESS;
+    }
 
-        // Load operation names
-        $operationNames = collect($stationOperationsData)->keyBy('_key')->map(fn ($op) => $op['operationName']['en'] ?? '');
+    /**
+     * Seed regions (top level of universe hierarchy)
+     *
+     * @return int Number of regions seeded
+     */
+    protected function seedRegions(): int
+    {
+        $regionClass = ClassResolver::region();
 
-        // Build lookup maps
-        $regionsMap = collect($regionsData)->keyBy('_key');
-        $constellationsMap = collect($constellationsData)->keyBy('_key');
-        $solarsystemsMap = collect($solarsystemsData)->keyBy('_key');
-        $planetsMap = collect($planetsData)->keyBy('_key');
-        $moonsMap = collect($moonsData)->keyBy('_key');
-        $starsMap = collect($starsData)->keyBy('_key');
+        return $this->streamUpsert(
+            $regionClass::query(),
+            JSONL::lazy(Storage::path('sde/mapRegions.jsonl'), RegionDto::class),
+            function (RegionDto $dto) {
+                $areaType = UniverseHelpers::determineAreaType($dto->id);
 
-        // Load Jove observatories
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->name,
+                    'type' => $areaType,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
+            ['id'],
+            ['name', 'type', 'updated_at'],
+            'Seeding Regions'
+        );
+    }
+
+    /**
+     * Seed constellations (belong to regions)
+     *
+     * @return int Number of constellations seeded
+     */
+    protected function seedConstellations(): int
+    {
+        $constellationClass = ClassResolver::constellation();
+
+        return $this->streamUpsert(
+            $constellationClass::query(),
+            JSONL::lazy(Storage::path('sde/mapConstellations.jsonl'), ConstellationDto::class),
+            function (ConstellationDto $dto) {
+                $areaType = UniverseHelpers::determineAreaType($dto->id);
+
+                return [
+                    'id' => $dto->id,
+                    'region_id' => $dto->regionId,
+                    'name' => $dto->name,
+                    'type' => $areaType,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
+            ['id'],
+            ['region_id', 'name', 'type', 'updated_at'],
+            'Seeding Constellations'
+        );
+    }
+
+    /**
+     * Seed solar systems and build lookup map for child entities
+     *
+     * @return array<int, array{constellationID: int, regionID: int, name: string}>
+     */
+    protected function seedSolarsystems(): array
+    {
+        $solarsystemClass = ClassResolver::solarsystem();
+
+        // Load Jove observatories data for special system flagging
+        /** @var array<int,int[]> $jove_observatories */
         $jove_observatories = require __DIR__.'/../../Data/jove_observatories.php';
         $jove_observatories_flat = [];
-        foreach ($jove_observatories as $regionName => $systems) {
+        foreach ($jove_observatories as $systems) {
             $jove_observatories_flat = array_merge($jove_observatories_flat, array_flip($systems));
         }
 
-        $regionClass = ClassResolver::region();
-        $constellationClass = ClassResolver::constellation();
-        $solarsystemClass = ClassResolver::solarsystem();
-        $celestialClass = ClassResolver::celestial();
-        $stationClass = ClassResolver::station();
+        // Build lightweight lookup for child entities
+        $solarsystemsLookup = [];
 
-        // Collect all data first, then perform bulk operations
-        $this->info('Collecting universe data...');
-        $regionsToInsert = [];
-        $constellationsToInsert = [];
-        $solarsystemsToInsert = [];
-        $celestialsToInsert = [];
-        $stationsToInsert = [];
-        $stargatesToInsert = [];
-
-        // Process regions
-        foreach ($regionsData as $region) {
-            $regionId = $region['_key'];
-            $regionName = $region['name']['en'] ?? '';
-            $areaType = UniverseHelpers::determineAreaType($regionId);
-
-            $regionsToInsert[] = [
-                'id' => $regionId,
-                'name' => $regionName,
-                'type' => $areaType,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process constellations
-        foreach ($constellationsData as $constellation) {
-            $constellationId = $constellation['_key'];
-            $constellationName = $constellation['name']['en'] ?? '';
-            $areaType = UniverseHelpers::determineAreaType($constellationId);
-
-            $constellationsToInsert[] = [
-                'id' => $constellationId,
-                'region_id' => $constellation['regionID'],
-                'name' => $constellationName,
-                'type' => $areaType,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process solar systems
-        foreach ($solarsystemsData as $solarsystem) {
-            $solarsystemId = $solarsystem['_key'];
-            $solarsystemName = $solarsystem['name']['en'] ?? '';
-            $areaType = UniverseHelpers::determineAreaType($solarsystemId);
-            $has_jove_observatory = isset($jove_observatories_flat[$solarsystemName]);
-
-            $solarsystemsToInsert[] = [
-                'id' => $solarsystemId,
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'name' => $solarsystemName,
-                'type' => $areaType,
-                'security' => (string) $solarsystem['securityStatus'],
-                'pos_x' => $solarsystem['position']['x'],
-                'pos_y' => $solarsystem['position']['y'],
-                'pos_z' => $solarsystem['position']['z'],
-                'has_jove_observatory' => $has_jove_observatory,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process stars
-        foreach ($starsData as $star) {
-            $starId = $star['_key'];
-            $solarsystem = $solarsystemsMap->get($star['solarSystemID']);
-            if (! $solarsystem) {
-                continue;
-            }
-
-            $solarsystemName = $solarsystem['name']['en'] ?? '';
-            $starName = UniverseHelpers::generateStarName($solarsystemName);
-
-            $celestialsToInsert[] = [
-                'id' => $starId,
-                'solarsystem_id' => $star['solarSystemID'],
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'name' => $starName,
-                'type_id' => $star['typeID'],
-                'group_id' => 6, // Star group
-                'parent_id' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process planets
-        foreach ($planetsData as $planet) {
-            $planetId = $planet['_key'];
-            $solarsystem = $solarsystemsMap->get($planet['solarSystemID']);
-            if (! $solarsystem) {
-                continue;
-            }
-
-            // Get orbit name (star name for planets)
-            $solarsystemName = $solarsystem['name']['en'] ?? '';
-            $planetName = UniverseHelpers::generatePlanetName($solarsystemName, $planet['celestialIndex']);
-
-            $celestialsToInsert[] = [
-                'id' => $planetId,
-                'solarsystem_id' => $planet['solarSystemID'],
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'name' => $planetName,
-                'type_id' => $planet['typeID'],
-                'group_id' => 7, // Planet group
-                'parent_id' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process moons
-        foreach ($moonsData as $moon) {
-            $moonId = $moon['_key'];
-            $solarsystem = $solarsystemsMap->get($moon['solarSystemID']);
-            if (! $solarsystem) {
-                continue;
-            }
-
-            // Get orbit name (planet name)
-            $planet = $planetsMap->get($moon['orbitID']);
-            if (! $planet) {
-                continue;
-            }
-
-            $solarsystemName = $solarsystem['name']['en'] ?? '';
-            $planetName = UniverseHelpers::generatePlanetName($solarsystemName, $planet['celestialIndex']);
-            $moonName = UniverseHelpers::generateMoonName($planetName, $moon['orbitIndex']);
-
-            $celestialsToInsert[] = [
-                'id' => $moonId,
-                'solarsystem_id' => $moon['solarSystemID'],
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'name' => $moonName,
-                'type_id' => $moon['typeID'],
-                'group_id' => 8, // Moon group
-                'parent_id' => $moon['orbitID'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process asteroid belts
-        foreach ($asteroidBeltsData as $asteroidBelt) {
-            $beltId = $asteroidBelt['_key'];
-            $solarsystem = $solarsystemsMap->get($asteroidBelt['solarSystemID']);
-            if (! $solarsystem) {
-                continue;
-            }
-
-            // Get orbit name (planet name)
-            $planet = $planetsMap->get($asteroidBelt['orbitID']);
-            if (! $planet) {
-                continue;
-            }
-
-            $solarsystemName = $solarsystem['name']['en'] ?? '';
-            $planetName = UniverseHelpers::generatePlanetName($solarsystemName, $planet['celestialIndex']);
-            $beltName = UniverseHelpers::generateAsteroidBeltName($planetName, $asteroidBelt['orbitIndex']);
-
-            $celestialsToInsert[] = [
-                'id' => $beltId,
-                'solarsystem_id' => $asteroidBelt['solarSystemID'],
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'name' => $beltName,
-                'type_id' => null, // Asteroid belts don't have typeID in the data
-                'group_id' => 9, // Asteroid Belt group
-                'parent_id' => $asteroidBelt['orbitID'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process stations
-        foreach ($stationsData as $station) {
-            $stationId = $station['_key'];
-            $solarsystem = $solarsystemsMap->get($station['solarSystemID']);
-            if (! $solarsystem) {
-                continue;
-            }
-
-            // Get orbit name (planet or moon name)
-            $orbitName = '';
-            $parentId = null;
-
-            if ($planetsMap->has($station['orbitID'])) {
-                $planet = $planetsMap->get($station['orbitID']);
-                $solarsystemName = $solarsystem['name']['en'] ?? '';
-                $orbitName = UniverseHelpers::generatePlanetName($solarsystemName, $planet['celestialIndex']);
-                $parentId = $station['orbitID'];
-            } elseif ($moonsMap->has($station['orbitID'])) {
-                $moon = $moonsMap->get($station['orbitID']);
-                $planet = $planetsMap->get($moon['orbitID']);
-                $solarsystemName = $solarsystem['name']['en'] ?? '';
-                $planetName = UniverseHelpers::generatePlanetName($solarsystemName, $planet['celestialIndex']);
-                $orbitName = UniverseHelpers::generateMoonName($planetName, $moon['orbitIndex']);
-                $parentId = $station['orbitID'];
-            }
-
-            // Get corporation name
-            $corporationName = $corporationNames->get($station['ownerID']) ?? 'Unknown Corporation';
-
-            // Get operation name if needed
-            $operationName = null;
-            if ($station['useOperationName'] && $station['operationID'] !== null) {
-                $operationName = $operationNames->get($station['operationID']);
-            }
-
-            $stationName = UniverseHelpers::generateStationName(
-                $orbitName,
-                $corporationName,
-                $operationName,
-                $station['useOperationName']
-            );
-
-            $stationsToInsert[] = [
-                'id' => $stationId,
-                'solarsystem_id' => $station['solarSystemID'],
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'name' => $stationName,
-                'type_id' => $station['typeID'],
-                'parent_id' => $parentId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Process stargates
-        foreach ($stargatesData as $stargate) {
-            $stargateId = $stargate['_key'];
-            $solarsystem = $solarsystemsMap->get($stargate['solarSystemID']);
-            if (! $solarsystem) {
-                continue;
-            }
-
-            $solarsystemName = $solarsystem['name']['en'] ?? '';
-            $stargateName = UniverseHelpers::generateStargateName($solarsystemName);
-
-            $stargatesToInsert[] = [
-                'id' => $stargateId,
-                'solarsystem_id' => $stargate['solarSystemID'],
-                'destination_id' => $stargate['destination']['stargateID'],
-                'constellation_id' => $solarsystem['constellationID'],
-                'region_id' => $solarsystem['regionID'],
-                'position_x' => $stargate['position']['x'],
-                'position_y' => $stargate['position']['y'],
-                'position_z' => $stargate['position']['z'],
-                'type_id' => $stargate['typeID'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        // Insert all data
-        $this->chunkedUpsert(
-            $regionClass::query(),
-            $regionsToInsert,
-            ['id'],
-            ['name', 'type', 'updated_at'],
-            'Upserting regions'
-        );
-
-        $this->chunkedUpsert(
-            $constellationClass::query(),
-            $constellationsToInsert,
-            ['id'],
-            ['region_id', 'name', 'type', 'updated_at'],
-            'Upserting constellations'
-        );
-
-        $this->chunkedUpsert(
+        $this->streamUpsert(
             $solarsystemClass::query(),
-            $solarsystemsToInsert,
+            JSONL::lazy(Storage::path('sde/mapSolarSystems.jsonl'), SolarsystemDto::class),
+            function (SolarsystemDto $solarsystem) use (&$solarsystemsLookup, $jove_observatories_flat) {
+                return $this->transformSolarsystem($solarsystem, $solarsystemsLookup, $jove_observatories_flat);
+            },
             ['id'],
             ['constellation_id', 'region_id', 'name', 'type', 'security', 'pos_x', 'pos_y', 'pos_z', 'updated_at', 'has_jove_observatory'],
-            'Upserting solarsystems'
+            'Seeding Solar Systems'
         );
 
-        $this->chunkedUpsert(
+        return $solarsystemsLookup;
+    }
+
+    /**
+     * Transform solar system data for database insertion
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  int[]  $jove_observatories_flat
+     * @return array{id: int, constellation_id: int, region_id: int, name: string, type: string, security: string, pos_x: float, pos_y: float, pos_z: float, has_jove_observatory: bool, created_at: Carbon, updated_at: Carbon}
+     */
+    private function transformSolarsystem(SolarsystemDto $dto, array &$solarsystemsLookup, array $jove_observatories_flat): array
+    {
+        // Store in lookup for children
+        $solarsystemsLookup[$dto->id] = [
+            'constellationID' => $dto->constellationId,
+            'regionID' => $dto->regionId,
+            'name' => $dto->name,
+        ];
+
+        $areaType = UniverseHelpers::determineAreaType($dto->id);
+        $has_jove_observatory = isset($jove_observatories_flat[$dto->name]);
+
+        return [
+            'id' => $dto->id,
+            'constellation_id' => $dto->constellationId,
+            'region_id' => $dto->regionId,
+            'name' => $dto->name,
+            'type' => $areaType,
+            'security' => (string) $dto->securityStatus,
+            'pos_x' => $dto->position->x,
+            'pos_y' => $dto->position->y,
+            'pos_z' => $dto->position->z,
+            'has_jove_observatory' => $has_jove_observatory,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    /**
+     * Seed stars (central celestial body in each system)
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @return int Number of stars seeded
+     */
+    protected function seedStars(array $solarsystemsLookup): int
+    {
+        $celestialClass = ClassResolver::celestial();
+
+        return $this->streamUpsert(
             $celestialClass::query(),
-            $celestialsToInsert,
+            JSONL::lazy(Storage::path('sde/mapStars.jsonl'), StarDto::class),
+            fn (StarDto $star) => $this->transformStar($star, $solarsystemsLookup),
             ['id'],
             ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'group_id', 'parent_id', 'updated_at'],
-            'Upserting celestials'
+            'Seeding Stars'
+        );
+    }
+
+    /**
+     * Transform star data for database insertion
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: null, created_at: Carbon, updated_at: Carbon}|null
+     */
+    private function transformStar(StarDto $dto, array $solarsystemsLookup): ?array
+    {
+        if (! isset($solarsystemsLookup[$dto->solarSystemId])) {
+            return null;
+        }
+
+        $sys = $solarsystemsLookup[$dto->solarSystemId];
+        $starName = UniverseHelpers::generateStarName($sys['name']);
+
+        return [
+            'id' => $dto->id,
+            'solarsystem_id' => $dto->solarSystemId,
+            'constellation_id' => $sys['constellationID'],
+            'region_id' => $sys['regionID'],
+            'name' => $starName,
+            'type_id' => $dto->typeId,
+            'group_id' => 6, // Star group
+            'parent_id' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    /**
+     * Seed planets and build lookup map for moons and stations
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @return array<int, array{celestialIndex: int}>
+     */
+    protected function seedPlanets(array $solarsystemsLookup): array
+    {
+        $celestialClass = ClassResolver::celestial();
+        $planetsLookup = [];
+
+        $this->streamUpsert(
+            $celestialClass::query(),
+            JSONL::lazy(Storage::path('sde/mapPlanets.jsonl'), PlanetDto::class),
+            function (PlanetDto $planet) use ($solarsystemsLookup, &$planetsLookup) {
+                return $this->transformPlanet($planet, $solarsystemsLookup, $planetsLookup);
+            },
+            ['id'],
+            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'group_id', 'parent_id', 'updated_at'],
+            'Seeding Planets'
         );
 
-        $this->chunkedUpsert(
+        return $planetsLookup;
+    }
+
+    /**
+     * Transform planet data for database insertion
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: null, created_at: Carbon, updated_at: Carbon}|null
+     */
+    private function transformPlanet(PlanetDto $dto, array $solarsystemsLookup, array &$planetsLookup): ?array
+    {
+        if (! isset($solarsystemsLookup[$dto->solarSystemId])) {
+            return null;
+        }
+
+        $sys = $solarsystemsLookup[$dto->solarSystemId];
+        $planetName = UniverseHelpers::generatePlanetName($sys['name'], $dto->celestialIndex);
+
+        $planetsLookup[$dto->id] = [
+            'celestialIndex' => $dto->celestialIndex,
+        ];
+
+        return [
+            'id' => $dto->id,
+            'solarsystem_id' => $dto->solarSystemId,
+            'constellation_id' => $sys['constellationID'],
+            'region_id' => $sys['regionID'],
+            'name' => $planetName,
+            'type_id' => $dto->typeId,
+            'group_id' => 7, // Planet group
+            'parent_id' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    /**
+     * Seed moons and build lookup map for stations
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @return array<int, array{orbitID: int, orbitIndex: int}>
+     */
+    protected function seedMoons(array $solarsystemsLookup, array $planetsLookup): array
+    {
+        $celestialClass = ClassResolver::celestial();
+        $moonsLookup = [];
+
+        $this->streamUpsert(
+            $celestialClass::query(),
+            JSONL::lazy(Storage::path('sde/mapMoons.jsonl'), MoonDto::class),
+            function (MoonDto $moon) use ($solarsystemsLookup, $planetsLookup, &$moonsLookup) {
+                return $this->transformMoon($moon, $solarsystemsLookup, $planetsLookup, $moonsLookup);
+            },
+            ['id'],
+            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'group_id', 'parent_id', 'updated_at'],
+            'Seeding Moons'
+        );
+
+        return $moonsLookup;
+    }
+
+    /**
+     * Transform moon data for database insertion
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @param  array<int, array{orbitID: int, orbitIndex: int}>  $moonsLookup
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: int, created_at: Carbon, updated_at: Carbon}|null
+     */
+    private function transformMoon(MoonDto $dto, array $solarsystemsLookup, array $planetsLookup, array &$moonsLookup): ?array
+    {
+        if (! isset($solarsystemsLookup[$dto->solarSystemId]) || ! isset($planetsLookup[$dto->orbitId])) {
+            return null;
+        }
+
+        $sys = $solarsystemsLookup[$dto->solarSystemId];
+        $planet = $planetsLookup[$dto->orbitId];
+
+        $planetName = UniverseHelpers::generatePlanetName($sys['name'], $planet['celestialIndex']);
+        $moonName = UniverseHelpers::generateMoonName($planetName, $dto->orbitIndex);
+
+        $moonsLookup[$dto->id] = [
+            'orbitID' => $dto->orbitId,
+            'orbitIndex' => $dto->orbitIndex,
+        ];
+
+        return [
+            'id' => $dto->id,
+            'solarsystem_id' => $dto->solarSystemId,
+            'constellation_id' => $sys['constellationID'],
+            'region_id' => $sys['regionID'],
+            'name' => $moonName,
+            'type_id' => $dto->typeId,
+            'group_id' => 8, // Moon group
+            'parent_id' => $dto->orbitId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    /**
+     * Seed asteroid belts
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @return int Number of asteroid belts seeded
+     */
+    protected function seedAsteroidBelts(array $solarsystemsLookup, array $planetsLookup): int
+    {
+        $celestialClass = ClassResolver::celestial();
+
+        return $this->streamUpsert(
+            $celestialClass::query(),
+            JSONL::lazy(Storage::path('sde/mapAsteroidBelts.jsonl'), AsteroidBeltDto::class),
+            fn (AsteroidBeltDto $belt) => $this->transformAsteroidBelt($belt, $solarsystemsLookup, $planetsLookup),
+            ['id'],
+            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'group_id', 'parent_id', 'updated_at'],
+            'Seeding Asteroid Belts'
+        );
+    }
+
+    /**
+     * Transform asteroid belt data for database insertion
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: null, group_id: int, parent_id: int, created_at: Carbon, updated_at: Carbon}|null
+     */
+    private function transformAsteroidBelt(AsteroidBeltDto $dto, array $solarsystemsLookup, array $planetsLookup): ?array
+    {
+        if (! isset($solarsystemsLookup[$dto->solarSystemId]) || ! isset($planetsLookup[$dto->orbitId])) {
+            return null;
+        }
+
+        $sys = $solarsystemsLookup[$dto->solarSystemId];
+        $planet = $planetsLookup[$dto->orbitId];
+
+        $planetName = UniverseHelpers::generatePlanetName($sys['name'], $planet['celestialIndex']);
+        $beltName = UniverseHelpers::generateAsteroidBeltName($planetName, $dto->orbitIndex);
+
+        return [
+            'id' => $dto->id,
+            'solarsystem_id' => $dto->solarSystemId,
+            'constellation_id' => $sys['constellationID'],
+            'region_id' => $sys['regionID'],
+            'name' => $beltName,
+            'type_id' => null,
+            'group_id' => 9, // Asteroid Belt group
+            'parent_id' => $dto->orbitId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    /**
+     * Seed NPC stations
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @param  array<int, array{orbitID: int, orbitIndex: int}>  $moonsLookup
+     * @return int Number of stations seeded
+     */
+    protected function seedStations(array $solarsystemsLookup, array $planetsLookup, array $moonsLookup): int
+    {
+        $stationClass = ClassResolver::station();
+
+        // Load auxiliary data for station names
+        $corporationNames = collect();
+        foreach (JSONL::lazy(Storage::path('sde/npcCorporations.jsonl'), CorporationDto::class) as $corporation) {
+            $corporationNames->put($corporation->id, $corporation->name);
+        }
+
+        // Load station operations for station naming
+        $operationNames = collect();
+        foreach (JSONL::lazy(Storage::path('sde/stationOperations.jsonl'), StationOperationDto::class) as $operation) {
+            $operationNames->put($operation->id, $operation->operationName);
+        }
+
+        return $this->streamUpsert(
             $stationClass::query(),
-            $stationsToInsert,
+            JSONL::lazy(Storage::path('sde/npcStations.jsonl'), StationDto::class),
+            fn (StationDto $station) => $this->transformStation($station, $solarsystemsLookup, $planetsLookup, $moonsLookup, $corporationNames, $operationNames),
             ['id'],
             ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'parent_id', 'updated_at'],
-            'Upserting stations'
+            'Seeding Stations'
+        );
+    }
+
+    /**
+     * Transform station data for database insertion
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @param  array<int, array{celestialIndex: int}>  $planetsLookup
+     * @param  array<int, array{orbitID: int, orbitIndex: int}>  $moonsLookup
+     * @param  Collection<int, string>  $corporationNames
+     * @param  Collection<int, string>  $operationNames
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, parent_id: int|null, created_at: Carbon, updated_at: Carbon}|null
+     */
+    private function transformStation(
+        StationDto $dto,
+        array $solarsystemsLookup,
+        array $planetsLookup,
+        array $moonsLookup,
+        Collection $corporationNames,
+        Collection $operationNames
+    ): ?array {
+        if (! isset($solarsystemsLookup[$dto->solarSystemId])) {
+            return null;
+        }
+
+        $sys = $solarsystemsLookup[$dto->solarSystemId];
+
+        $orbitName = '';
+        $parentId = null;
+
+        if (isset($planetsLookup[$dto->orbitId])) {
+            $planet = $planetsLookup[$dto->orbitId];
+            $orbitName = UniverseHelpers::generatePlanetName($sys['name'], $planet['celestialIndex']);
+            $parentId = $dto->orbitId;
+        } elseif (isset($moonsLookup[$dto->orbitId])) {
+            $moon = $moonsLookup[$dto->orbitId];
+            // Need planet for moon name
+            if (isset($planetsLookup[$moon['orbitID']])) {
+                $planet = $planetsLookup[$moon['orbitID']];
+                $planetName = UniverseHelpers::generatePlanetName($sys['name'], $planet['celestialIndex']);
+                $orbitName = UniverseHelpers::generateMoonName($planetName, $moon['orbitIndex']);
+                $parentId = $dto->orbitId;
+            }
+        }
+
+        $corporationName = $corporationNames->get($dto->ownerId) ?? 'Unknown Corporation';
+
+        $operationName = null;
+        if ($dto->useOperationName && $dto->operationId !== null) {
+            $operationName = $operationNames->get($dto->operationId);
+        }
+
+        $stationName = UniverseHelpers::generateStationName(
+            $orbitName,
+            $corporationName,
+            $operationName,
+            $dto->useOperationName
         );
 
-        DB::transaction(function () use ($stargatesToInsert) {
-            Schema::disableForeignKeyConstraints();
-            $this->chunkedUpsert(
-                Stargate::query(),
-                $stargatesToInsert,
-                ['id'],
-                ['solarsystem_id', 'destination_id', 'constellation_id', 'region_id', 'position_x', 'position_y', 'position_z', 'type_id', 'updated_at'],
-                'Upserting stargates'
-            );
-            Schema::enableForeignKeyConstraints();
-        });
+        return [
+            'id' => $dto->id,
+            'solarsystem_id' => $dto->solarSystemId,
+            'constellation_id' => $sys['constellationID'],
+            'region_id' => $sys['regionID'],
+            'name' => $stationName,
+            'type_id' => $dto->typeId,
+            'parent_id' => $parentId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
 
-        $this->info('Generating stargate connections...');
+    /**
+     * Seed stargates and their connections
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @return array{int, int} Returns [stargate count, connection count]
+     *
+     * @throws Throwable
+     */
+    protected function seedStargatesAndConnections(array $solarsystemsLookup): array
+    {
+        return spin(fn () => $this->processStargates($solarsystemsLookup), 'Seeding Stargates and Connections');
+    }
 
-        // Get all stargates with their destination info in one query
-        $stargates = Stargate::query()
-            ->select(['id', 'destination_id', 'solarsystem_id', 'region_id', 'constellation_id'])
-            ->get()
-            ->keyBy('id');
+    /**
+     * Process stargates and connections
+     *
+     * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
+     * @return array{int,int}
+     *
+     * @throws Throwable
+     */
+    private function processStargates(array $solarsystemsLookup): array
+    {
+        $stargatesBuffer = [];
+        $connectionsBuffer = [];
+        $stargateCount = 0;
+        $connectionCount = 0;
 
-        $connectionsData = [];
-        foreach ($stargates as $stargate) {
-            $destination = $stargates->get($stargate->destination_id);
-            $connectionsData[] = [
-                'from_stargate_id' => $stargate->id,
-                'from_solarsystem_id' => $stargate->solarsystem_id,
-                'from_region_id' => $stargate->region_id,
-                'from_constellation_id' => $stargate->constellation_id,
-                'to_stargate_id' => $stargate->destination_id,
-                'to_solarsystem_id' => $destination?->solarsystem_id,
-                'to_region_id' => $destination?->region_id,
-                'to_constellation_id' => $destination?->constellation_id,
-                'is_regional' => $stargate->region_id !== $destination?->region_id,
+        foreach (JSONL::lazy(Storage::path('sde/mapStargates.jsonl'), StargateDto::class) as $dto) {
+            if (! isset($solarsystemsLookup[$dto->solarSystemId])) {
+                continue;
+            }
+
+            $sys = $solarsystemsLookup[$dto->solarSystemId];
+
+            // Buffer stargate record
+            $stargatesBuffer[] = [
+                'id' => $dto->id,
+                'solarsystem_id' => $dto->solarSystemId,
+                'destination_id' => $dto->destination->stargateId,
+                'constellation_id' => $sys['constellationID'],
+                'region_id' => $sys['regionID'],
+                'position_x' => $dto->position->x,
+                'position_y' => $dto->position->y,
+                'position_z' => $dto->position->z,
+                'type_id' => $dto->typeId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
+
+            // Build connection record for this stargate
+            $destSys = $solarsystemsLookup[$dto->destination->solarSystemId] ?? null;
+
+            $connectionsBuffer[] = [
+                'from_stargate_id' => $dto->id,
+                'from_solarsystem_id' => $dto->solarSystemId,
+                'from_region_id' => $sys['regionID'],
+                'from_constellation_id' => $sys['constellationID'],
+                'to_stargate_id' => $dto->destination->stargateId,
+                'to_solarsystem_id' => $dto->destination->solarSystemId,
+                'to_region_id' => $destSys['regionID'] ?? null,
+                'to_constellation_id' => $destSys['constellationID'] ?? null,
+                'is_regional' => isset($destSys) && $sys['regionID'] !== $destSys['regionID'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            $stargateCount++;
+            $connectionCount++;
+
+            // Flush buffers when chunk size is reached
+            if (count($stargatesBuffer) >= self::UPSERT_CHUNK_SIZE) {
+                $this->flushStargateBuffers($stargatesBuffer, $connectionsBuffer);
+                $stargatesBuffer = [];
+                $connectionsBuffer = [];
+            }
         }
 
-        DB::transaction(function () use ($connectionsData) {
+        // Flush remaining stargates and connections
+        if (! empty($stargatesBuffer)) {
+            $this->flushStargateBuffers($stargatesBuffer, $connectionsBuffer);
+        }
+
+        return [$stargateCount, $connectionCount];
+    }
+
+    /**
+     * Flush stargate and connection buffers to database
+     *
+     * @param  array<int, array<string, mixed>>  $stargatesBuffer
+     * @param  array<int, array<string, mixed>>  $connectionsBuffer
+     *
+     * @throws Throwable
+     */
+    private function flushStargateBuffers(array $stargatesBuffer, array $connectionsBuffer): void
+    {
+        DB::transaction(function () use ($stargatesBuffer, $connectionsBuffer) {
             Schema::disableForeignKeyConstraints();
-
-            $this->chunkedUpsert(
-                SolarsystemConnection::query(),
-                $connectionsData,
-                ['from_stargate_id'],
-                ['from_solarsystem_id', 'from_region_id', 'from_constellation_id', 'to_stargate_id', 'to_solarsystem_id', 'to_region_id', 'to_constellation_id', 'is_regional', 'updated_at'],
-                'Upserting stargate connections'
+            Stargate::query()->upsert(
+                $stargatesBuffer,
+                ['id'],
+                ['solarsystem_id', 'destination_id', 'constellation_id', 'region_id', 'position_x', 'position_y', 'position_z', 'type_id', 'updated_at']
             );
-
+            SolarsystemConnection::query()->upsert(
+                $connectionsBuffer,
+                ['from_stargate_id'],
+                ['from_solarsystem_id', 'from_region_id', 'from_constellation_id', 'to_stargate_id', 'to_solarsystem_id', 'to_region_id', 'to_constellation_id', 'is_regional', 'updated_at']
+            );
             Schema::enableForeignKeyConstraints();
         });
-
-        $this->info(sprintf(
-            'Successfully seeded universe: %d regions, %d constellations, %d solarsystems, %d celestials, %d stations, %d stargates, %d connections',
-            count($regionsToInsert),
-            count($constellationsToInsert),
-            count($solarsystemsToInsert),
-            count($celestialsToInsert),
-            count($stationsToInsert),
-            count($stargatesToInsert),
-            count($connectionsData)
-        ));
-
-        return self::SUCCESS;
     }
 }

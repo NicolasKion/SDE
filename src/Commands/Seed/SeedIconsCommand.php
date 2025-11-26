@@ -7,6 +7,7 @@ namespace NicolasKion\SDE\Commands\Seed;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\IconDto;
 use NicolasKion\SDE\Support\JSONL;
 
 /**
@@ -27,30 +28,27 @@ class SeedIconsCommand extends BaseSeedCommand
     public function handle(): int
     {
         $this->ensureSDEExists();
-
-        /** @var IconsFile $data */
-        $data = JSONL::parse(Storage::path(self::ICONS_FILE));
+        $this->startMemoryTracking();
 
         $icon = ClassResolver::icon();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'file' => $item['iconFile'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        $this->chunkedUpsert(
+        $count = $this->streamUpsert(
             $icon::query(),
-            $upsertData,
+            JSONL::lazy(Storage::path(self::ICONS_FILE), IconDto::class),
+            function (IconDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'file' => $dto->file,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
             ['id'],
-            ['file', 'updated_at']
+            ['file', 'updated_at'],
+            'Seeding Icons'
         );
 
-        $this->info(sprintf('Successfully seeded %d icons', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

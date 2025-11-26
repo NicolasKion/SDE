@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\MarketGroupDto;
 use NicolasKion\SDE\Support\JSONL;
 use Throwable;
 
@@ -32,39 +31,31 @@ class SeedMarketGroupsCommand extends BaseSeedCommand
      */
     public function handle(): int
     {
-
-        /** @var MarketGroupsFile $data */
-        $data = JSONL::parse(Storage::path(self::MARKET_GROUPS_FILE));
+        $this->startMemoryTracking();
 
         $marketGroup = ClassResolver::marketGroup();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'parent_id' => $item['parentGroupID'] ?? null,
-                'name' => $item['name']['en'] ?? '',
-                'description' => $item['description']['en'] ?? '',
-                'icon_id' => $item['iconID'] ?? null,
-                'has_types' => $item['hasTypes'] ?? true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
+        $count = $this->streamUpsert(
+            $marketGroup::query(),
+            JSONL::lazy(Storage::path(self::MARKET_GROUPS_FILE), MarketGroupDto::class),
+            function (MarketGroupDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'parent_id' => $dto->parentId,
+                    'name' => $dto->name,
+                    'description' => $dto->description,
+                    'icon_id' => $dto->iconId,
+                    'has_types' => $dto->hasTypes,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
+            ['id'],
+            ['parent_id', 'name', 'description', 'icon_id', 'has_types', 'updated_at'],
+            'Seeding Market Groups'
+        );
 
-        DB::transaction(function () use ($upsertData, $marketGroup) {
-            Schema::disableForeignKeyConstraints();
-
-            $this->chunkedUpsert(
-                $marketGroup::query(),
-                $upsertData,
-                ['id'],
-                ['parent_id', 'name', 'description', 'icon_id', 'has_types', 'updated_at']
-            );
-
-            Schema::enableForeignKeyConstraints();
-        });
-        $this->info(sprintf('Successfully seeded %d market groups', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }

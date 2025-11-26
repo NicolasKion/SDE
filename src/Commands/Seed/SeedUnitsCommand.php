@@ -6,6 +6,7 @@ namespace NicolasKion\SDE\Commands\Seed;
 
 use Illuminate\Support\Facades\Storage;
 use NicolasKion\SDE\ClassResolver;
+use NicolasKion\SDE\Data\Dto\UnitDto;
 use NicolasKion\SDE\Support\JSONL;
 
 /**
@@ -24,31 +25,29 @@ class SeedUnitsCommand extends BaseSeedCommand
 
     public function handle(): int
     {
-        /** @var UnitsFile $data */
-        $data = JSONL::parse(Storage::path(self::UNITS_FILE));
+        $this->startMemoryTracking();
 
         $unit = ClassResolver::unit();
 
-        $upsertData = [];
-        foreach ($data as $item) {
-            $upsertData[] = [
-                'id' => $item['_key'],
-                'name' => $item['name'],
-                'description' => $item['description']['en'] ?? '',
-                'display_name' => $item['displayName']['en'] ?? '',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }
-
-        $this->chunkedUpsert(
+        $count = $this->streamUpsert(
             $unit::query(),
-            $upsertData,
+            JSONL::lazy(Storage::path(self::UNITS_FILE), UnitDto::class),
+            function (UnitDto $dto) {
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->name,
+                    'description' => $dto->description,
+                    'display_name' => $dto->displayName,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
             ['id'],
-            ['display_name', 'description', 'name', 'updated_at']
+            ['display_name', 'description', 'name', 'updated_at'],
+            'Seeding Units'
         );
 
-        $this->info(sprintf('Successfully seeded %d units', count($data)));
+        $this->displayMemoryStats($count);
 
         return self::SUCCESS;
     }
