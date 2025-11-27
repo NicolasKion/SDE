@@ -13,22 +13,24 @@ final readonly class SolarsystemDto
         public int $regionId,
         public float $securityStatus,
         public PositionDto $position,
+        public ?Position2dDto $position2d,
         public ?float $radius,
         public ?string $securityClass,
     ) {}
 
     /**
-     * @param  array{_key: int, name: array{en: string}, constellationID: int, regionID: int, securityStatus: float, position: array{x: float, y: float, z: float}, radius: float|null, securityClass: string|null}  $data
+     * @param  array{_key: int, name: array{en: string}, constellationID: int, regionID: int, securityStatus: float, position: array{x: float, y: float, z: float}, position2D: array{x: float, y: float, z: float}|null, radius: float|null, securityClass: string|null}  $data
      */
     public static function fromArray(array $data): self
     {
         return new self(
             id: $data['_key'],
-            name: $data['name']['en'] ?? '',
+            name: $data['name']['en'],
             constellationId: $data['constellationID'],
             regionId: $data['regionID'],
             securityStatus: $data['securityStatus'],
             position: PositionDto::fromArray($data['position']),
+            position2d: Position2dDto::fromArray($data['position2D'] ?? null),
             radius: $data['radius'] ?? null,
             securityClass: $data['securityClass'] ?? null,
         );

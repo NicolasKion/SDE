@@ -51,6 +51,7 @@ use function Laravel\Prompts\spin;
  *     name: array{en: string|null},
  *     securityStatus: float,
  *     position: array{x: float, y: float, z: float},
+ *     position2D: array{x: float, y: float}|null,
  *     starID: int,
  *     planetIDs: array<int>,
  * }
@@ -242,7 +243,7 @@ class SeedUniverseCommand extends BaseSeedCommand
                 return $this->transformSolarsystem($solarsystem, $solarsystemsLookup, $jove_observatories_flat);
             },
             ['id'],
-            ['constellation_id', 'region_id', 'name', 'type', 'security', 'pos_x', 'pos_y', 'pos_z', 'updated_at', 'has_jove_observatory'],
+            ['constellation_id', 'region_id', 'name', 'type', 'security', 'pos_x', 'pos_y', 'pos_z', 'pos_2d_x', 'pos_2d_y', 'updated_at', 'has_jove_observatory'],
             'Seeding Solar Systems'
         );
 
@@ -278,6 +279,8 @@ class SeedUniverseCommand extends BaseSeedCommand
             'pos_x' => $dto->position->x,
             'pos_y' => $dto->position->y,
             'pos_z' => $dto->position->z,
+            'pos_2d_x' => $dto->position2d?->x,
+            'pos_2d_y' => $dto->position2d?->y,
             'has_jove_observatory' => $has_jove_observatory,
             'created_at' => now(),
             'updated_at' => now(),

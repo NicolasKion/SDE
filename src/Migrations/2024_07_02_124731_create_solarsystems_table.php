@@ -22,6 +22,8 @@ return new class extends Migration
             $table->double('pos_x');
             $table->double('pos_y');
             $table->double('pos_z');
+            $table->double('pos_2d_x')->nullable();
+            $table->double('pos_2d_y')->nullable();
             $table->string('type')->index();
             $table->boolean('has_jove_observatory')->default(false);
             $table->timestamps();
