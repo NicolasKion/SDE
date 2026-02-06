@@ -21,6 +21,8 @@ class Station extends Model
         'parent_id',
         'type_id',
         'group_id',
+        'operation_id',
+        'owner_id',
     ];
 
     /**
@@ -69,5 +71,21 @@ class Station extends Model
     public function region(): BelongsTo
     {
         return $this->belongsTo(ClassResolver::region());
+    }
+
+    /**
+     * @return BelongsTo<StationOperation,$this>
+     */
+    public function operation(): BelongsTo
+    {
+        return $this->belongsTo(ClassResolver::stationOperation(), 'operation_id');
+    }
+
+    /**
+     * @return BelongsTo<Corporation,$this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(ClassResolver::corporation(), 'owner_id');
     }
 }

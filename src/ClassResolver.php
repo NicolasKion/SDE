@@ -20,12 +20,15 @@ use NicolasKion\SDE\Models\Group;
 use NicolasKion\SDE\Models\Icon;
 use NicolasKion\SDE\Models\MarketGroup;
 use NicolasKion\SDE\Models\MetaGroup;
+use NicolasKion\SDE\Models\OperationService;
 use NicolasKion\SDE\Models\Race;
 use NicolasKion\SDE\Models\Region;
+use NicolasKion\SDE\Models\Service;
 use NicolasKion\SDE\Models\Solarsystem;
 use NicolasKion\SDE\Models\SolarsystemConnection;
 use NicolasKion\SDE\Models\Stargate;
 use NicolasKion\SDE\Models\Station;
+use NicolasKion\SDE\Models\StationOperation;
 use NicolasKion\SDE\Models\Type;
 use NicolasKion\SDE\Models\TypeAttribute;
 use NicolasKion\SDE\Models\TypeEffect;
@@ -255,5 +258,29 @@ class ClassResolver
     public static function solarsystemConnection(): string
     {
         return self::getClass(SolarsystemConnection::class);
+    }
+
+    /**
+     * @return class-string<StationOperation>
+     */
+    public static function stationOperation(): string
+    {
+        return self::getClass(StationOperation::class);
+    }
+
+    /**
+     * @return class-string<Service>
+     */
+    public static function service(): string
+    {
+        return self::getClass(Service::class);
+    }
+
+    /**
+     * @return class-string<OperationService>
+     */
+    public static function operationService(): string
+    {
+        return self::getClass(OperationService::class);
     }
 }

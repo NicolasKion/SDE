@@ -21,6 +21,8 @@ return new class extends Migration
             $table->foreignId('region_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('parent_id')->nullable()->constrained('celestials')->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('type_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('operation_id')->nullable()->constrained('station_operations')->nullOnDelete();
+            $table->foreignId('owner_id')->nullable();
             $table->timestamps();
         });
     }

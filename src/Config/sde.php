@@ -17,12 +17,15 @@ use NicolasKion\SDE\Models\Group;
 use NicolasKion\SDE\Models\Icon;
 use NicolasKion\SDE\Models\MarketGroup;
 use NicolasKion\SDE\Models\MetaGroup;
+use NicolasKion\SDE\Models\OperationService;
 use NicolasKion\SDE\Models\Race;
 use NicolasKion\SDE\Models\Region;
+use NicolasKion\SDE\Models\Service;
 use NicolasKion\SDE\Models\Solarsystem;
 use NicolasKion\SDE\Models\SolarsystemConnection;
 use NicolasKion\SDE\Models\Stargate;
 use NicolasKion\SDE\Models\Station;
+use NicolasKion\SDE\Models\StationOperation;
 use NicolasKion\SDE\Models\Type;
 use NicolasKion\SDE\Models\TypeAttribute;
 use NicolasKion\SDE\Models\Unit;
@@ -53,5 +56,8 @@ return [
         'EffectModifier' => EffectModifier::class,
         'Stargate' => Stargate::class,
         'SolarsystemConnection' => SolarsystemConnection::class,
+        'StationOperation' => StationOperation::class,
+        'Service' => Service::class,
+        'OperationService' => OperationService::class,
     ],
 ];

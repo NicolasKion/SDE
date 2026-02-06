@@ -22,8 +22,12 @@ use NicolasKion\SDE\Data\Dto\StarDto;
 use NicolasKion\SDE\Data\Dto\StargateDto;
 use NicolasKion\SDE\Data\Dto\StationDto;
 use NicolasKion\SDE\Data\Dto\StationOperationDto;
+use NicolasKion\SDE\Data\Dto\StationServiceDto;
+use NicolasKion\SDE\Models\OperationService;
+use NicolasKion\SDE\Models\Service;
 use NicolasKion\SDE\Models\SolarsystemConnection;
 use NicolasKion\SDE\Models\Stargate;
+use NicolasKion\SDE\Models\StationOperation;
 use NicolasKion\SDE\Support\JSONL;
 use NicolasKion\SDE\Support\UniverseHelpers;
 use Throwable;
@@ -142,6 +146,12 @@ class SeedUniverseCommand extends BaseSeedCommand
         $beltCount = $this->seedAsteroidBelts($solarsystemsLookup, $planetsLookup);
         $this->logMemoryUsage('Asteroid Belts Complete');
 
+        $serviceCount = $this->seedServices();
+        $this->logMemoryUsage('Services Complete');
+
+        [$operationCount, $operationServiceCount] = $this->seedStationOperations();
+        $this->logMemoryUsage('Station Operations Complete');
+
         $stationCount = $this->seedStations($solarsystemsLookup, $planetsLookup, $moonsLookup);
         $this->logMemoryUsage('Stations Complete');
 
@@ -150,7 +160,8 @@ class SeedUniverseCommand extends BaseSeedCommand
 
         $totalRecords = $regionCount + $constellationCount + count($solarsystemsLookup) +
                         $starCount + count($planetsLookup) + count($moonsLookup) +
-                        $beltCount + $stationCount + $stargateCount + $connectionCount;
+                        $beltCount + $serviceCount + $operationCount + $operationServiceCount +
+                        $stationCount + $stargateCount + $connectionCount;
 
         $this->displayMemoryStats($totalRecords);
 
@@ -515,6 +526,77 @@ class SeedUniverseCommand extends BaseSeedCommand
     }
 
     /**
+     * Seed station services
+     *
+     * @return int Number of services seeded
+     */
+    protected function seedServices(): int
+    {
+        return $this->streamUpsert(
+            Service::query(),
+            JSONL::lazy(Storage::path('sde/stationServices.jsonl'), StationServiceDto::class),
+            fn (StationServiceDto $dto) => [
+                'id' => $dto->id,
+                'name' => $dto->serviceName,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            ['id'],
+            ['name', 'updated_at'],
+            'Seeding Services'
+        );
+    }
+
+    /**
+     * Seed station operations and their service relationships
+     *
+     * @return array{int, int} Returns [operation count, operation_service count]
+     */
+    protected function seedStationOperations(): array
+    {
+        $operationServiceRecords = [];
+
+        $operationCount = $this->streamUpsert(
+            StationOperation::query(),
+            JSONL::lazy(Storage::path('sde/stationOperations.jsonl'), StationOperationDto::class),
+            function (StationOperationDto $dto) use (&$operationServiceRecords) {
+                // Collect operation-service relationships
+                foreach ($dto->services as $serviceId) {
+                    $operationServiceRecords[] = [
+                        'station_operation_id' => $dto->id,
+                        'service_id' => $serviceId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+
+                return [
+                    'id' => $dto->id,
+                    'name' => $dto->operationName,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            },
+            ['id'],
+            ['name', 'updated_at'],
+            'Seeding Station Operations'
+        );
+
+        // Seed operation_services pivot table
+        $operationServiceCount = 0;
+        foreach (array_chunk($operationServiceRecords, self::UPSERT_CHUNK_SIZE) as $chunk) {
+            OperationService::query()->upsert(
+                $chunk,
+                ['station_operation_id', 'service_id'],
+                ['updated_at']
+            );
+            $operationServiceCount += count($chunk);
+        }
+
+        return [$operationCount, $operationServiceCount];
+    }
+
+    /**
      * Seed NPC stations
      *
      * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
@@ -543,7 +625,7 @@ class SeedUniverseCommand extends BaseSeedCommand
             JSONL::lazy(Storage::path('sde/npcStations.jsonl'), StationDto::class),
             fn (StationDto $station) => $this->transformStation($station, $solarsystemsLookup, $planetsLookup, $moonsLookup, $corporationNames, $operationNames),
             ['id'],
-            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'parent_id', 'updated_at'],
+            ['solarsystem_id', 'constellation_id', 'region_id', 'name', 'type_id', 'parent_id', 'operation_id', 'owner_id', 'updated_at'],
             'Seeding Stations'
         );
     }
@@ -556,7 +638,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      * @param  array<int, array{orbitID: int, orbitIndex: int}>  $moonsLookup
      * @param  Collection<int, string>  $corporationNames
      * @param  Collection<int, string>  $operationNames
-     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, parent_id: int|null, created_at: Carbon, updated_at: Carbon}|null
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, parent_id: int|null, operation_id: int|null, owner_id: int, created_at: Carbon, updated_at: Carbon}|null
      */
     private function transformStation(
         StationDto $dto,
@@ -612,6 +694,8 @@ class SeedUniverseCommand extends BaseSeedCommand
             'name' => $stationName,
             'type_id' => $dto->typeId,
             'parent_id' => $parentId,
+            'operation_id' => $dto->operationId,
+            'owner_id' => $dto->ownerId,
             'created_at' => now(),
             'updated_at' => now(),
         ];
