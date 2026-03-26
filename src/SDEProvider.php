@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use NicolasKion\SDE\Commands\DownloadSDECommand;
 use NicolasKion\SDE\Commands\Seed\SeedAttributesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedCategoriesCommand;
+use NicolasKion\SDE\Commands\Seed\SeedDynamicItemAttributesCommand;
 use NicolasKion\SDE\Commands\Seed\SeedEffectsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedGraphicsCommand;
 use NicolasKion\SDE\Commands\Seed\SeedGroupsCommand;
@@ -58,6 +59,7 @@ class SDEProvider extends ServiceProvider
                 SeedUniverseCommand::class,
                 SeedSocialsCommand::class,
                 SeedEffectsCommand::class,
+                SeedDynamicItemAttributesCommand::class,
             ]);
         }
     }
