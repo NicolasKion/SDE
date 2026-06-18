@@ -15,7 +15,7 @@ final readonly class TypeDogmaDto
     ) {}
 
     /**
-     * @param  array{_key: int, dogmaEffects: array<int, array{effectID: int, isDefault: bool}>}  $data
+     * @param  array{_key: int, dogmaEffects?: array<int, array{effectID: int, isDefault: bool}>}  $data
      */
     public static function fromArray(array $data): self
     {

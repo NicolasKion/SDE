@@ -12,6 +12,19 @@ use Illuminate\Support\Facades\Schema;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\table;
 
+/**
+ * @phpstan-type CommandStats array{
+ *     command: string,
+ *     start_memory: int,
+ *     final_memory: int,
+ *     peak_memory: int,
+ *     delta_memory: int,
+ *     duration: float,
+ *     efficiency: string,
+ *     record_count: int|null,
+ *     timestamp: string,
+ * }
+ */
 class SeedCommand extends Command
 {
     protected $signature = 'sde:seed';
@@ -72,25 +85,27 @@ class SeedCommand extends Command
     {
         $stats = Cache::get(self::CACHE_KEY, []);
 
-        if (empty($stats)) {
+        if (! is_array($stats) || empty($stats)) {
             return;
         }
 
+        /** @var array<string, CommandStats> $stats */
         $rows = [];
         $totalRecords = 0;
         $maxPeak = 0;
 
         foreach ($stats as $commandName => $data) {
+            $recordCount = $data['record_count'];
             $rows[] = [
                 str_replace('sde:seed:', '', $commandName),
-                $data['record_count'] ? number_format($data['record_count']) : '-',
+                $recordCount ? number_format($recordCount) : '-',
                 $this->formatBytes($data['peak_memory']),
                 $this->formatBytes($data['delta_memory']),
                 sprintf('%.2fs', $data['duration']),
             ];
 
-            if ($data['record_count']) {
-                $totalRecords += $data['record_count'];
+            if ($recordCount) {
+                $totalRecords += $recordCount;
             }
             $maxPeak = max($maxPeak, $data['peak_memory']);
         }
@@ -131,7 +146,7 @@ class SeedCommand extends Command
         $units = ['B', 'KB', 'MB', 'GB'];
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
+        $pow = (int) min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
 
         return round($bytes, 2).' '.$units[$pow];

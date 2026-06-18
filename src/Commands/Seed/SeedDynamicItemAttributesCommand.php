@@ -35,7 +35,6 @@ class SeedDynamicItemAttributesCommand extends BaseSeedCommand
             $attributes = [];
 
             foreach (JSONL::lazy($path, DynamicItemAttributeDto::class) as $dto) {
-                /** @var DynamicItemAttributeDto $dto */
                 foreach ($dto->inputOutputMapping as $mapping) {
                     $mutaplasmids[] = [
                         'id' => $dto->id,
@@ -67,8 +66,9 @@ class SeedDynamicItemAttributesCommand extends BaseSeedCommand
             // Re-read for attributes properly
             $attributes = [];
             foreach (JSONL::lazy($path, DynamicItemAttributeDto::class) as $dto) {
+                $rawLines = file($path);
                 $raw = json_decode(
-                    collect(file($path))->skip(0)->first(fn ($line) => str_contains($line, '"_key": '.$dto->id)) ?? '{}',
+                    collect($rawLines === false ? [] : $rawLines)->skip(0)->first(fn ($line) => str_contains($line, '"_key": '.$dto->id)) ?? '{}',
                     true
                 );
 
@@ -81,12 +81,18 @@ class SeedDynamicItemAttributesCommand extends BaseSeedCommand
             $applicableTypes = [];
             $attributes = [];
 
-            foreach (file($path) as $line) {
+            $lines = file($path);
+            if ($lines === false) {
+                $lines = [];
+            }
+
+            foreach ($lines as $line) {
                 $entry = json_decode(trim($line), true);
-                if (! $entry) {
+                if (! $entry || ! is_array($entry)) {
                     continue;
                 }
 
+                /** @var array{_key: int, inputOutputMapping?: array<int, array{applicableTypes: int[], resultingType: int}>, attributeIDs?: array<int, array{_key: int, min: float|int, max: float|int, highIsGood?: bool}>} $entry */
                 $mutaplasmidId = $entry['_key'];
 
                 foreach ($entry['inputOutputMapping'] ?? [] as $mapping) {

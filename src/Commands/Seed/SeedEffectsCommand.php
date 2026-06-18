@@ -95,14 +95,14 @@ class SeedEffectsCommand extends BaseSeedCommand
             // Flush buffers when chunk size is reached
             if (count($effectsBuffer) >= self::UPSERT_CHUNK_SIZE) {
                 DB::transaction(function () use ($effectModel, $effectModifierModel, &$effectsBuffer, &$modifiersBuffer) {
-                    $effectModel::upsert(
+                    $effectModel::query()->upsert(
                         $effectsBuffer,
                         ['id'],
                         ['name', 'description', 'icon_id', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
                     );
 
                     if (! empty($modifiersBuffer)) {
-                        $effectModifierModel::upsert(
+                        $effectModifierModel::query()->upsert(
                             $modifiersBuffer,
                             ['effect_id', 'domain', 'func', 'modified_attribute_id', 'modifying_attribute_id'],
                             ['operator', 'group_id', 'skill_type_id', 'updated_at']
@@ -118,14 +118,14 @@ class SeedEffectsCommand extends BaseSeedCommand
         // Flush remaining effects and modifiers
         if (! empty($effectsBuffer)) {
             DB::transaction(function () use ($effectModel, $effectModifierModel, $effectsBuffer, $modifiersBuffer) {
-                $effectModel::upsert(
+                $effectModel::query()->upsert(
                     $effectsBuffer,
                     ['id'],
                     ['name', 'description', 'icon_id', 'published', 'is_assistance', 'is_offensive', 'is_warp_safe', 'discharge_attribute_id', 'duration_attribute_id', 'falloff_attribute_id', 'range_attribute_id', 'tracking_speed_attribute_id', 'propulsion_chance', 'electronic_chance', 'effect_category', 'disallow_auto_repeat', 'display_name', 'range_chance', 'fitting_usage_chance_attribute_id', 'resistance_attribute_id', 'updated_at']
                 );
 
                 if (! empty($modifiersBuffer)) {
-                    $effectModifierModel::upsert(
+                    $effectModifierModel::query()->upsert(
                         $modifiersBuffer,
                         ['effect_id', 'domain', 'func', 'modified_attribute_id', 'modifying_attribute_id'],
                         ['operator', 'group_id', 'skill_type_id', 'updated_at']

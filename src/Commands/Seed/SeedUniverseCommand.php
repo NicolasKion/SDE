@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace NicolasKion\SDE\Commands\Seed;
 
+use Carbon\CarbonInterface;
 use Exception;
-use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -169,6 +171,20 @@ class SeedUniverseCommand extends BaseSeedCommand
     }
 
     /**
+     * Build a model-agnostic query builder for the given model class.
+     *
+     * The upsert helpers in the base command operate on any model, so the
+     * concrete model type is intentionally erased to Builder<Model> here.
+     *
+     * @param  class-string<Model>  $modelClass
+     * @return Builder<Model>
+     */
+    private function modelQuery(string $modelClass): Builder
+    {
+        return $modelClass::query();
+    }
+
+    /**
      * Seed regions (top level of universe hierarchy)
      *
      * @return int Number of regions seeded
@@ -178,7 +194,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $regionClass = ClassResolver::region();
 
         return $this->streamUpsert(
-            $regionClass::query(),
+            $this->modelQuery($regionClass),
             JSONL::lazy(Storage::path('sde/mapRegions.jsonl'), RegionDto::class),
             function (RegionDto $dto) {
                 $areaType = UniverseHelpers::determineAreaType($dto->id);
@@ -207,7 +223,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $constellationClass = ClassResolver::constellation();
 
         return $this->streamUpsert(
-            $constellationClass::query(),
+            $this->modelQuery($constellationClass),
             JSONL::lazy(Storage::path('sde/mapConstellations.jsonl'), ConstellationDto::class),
             function (ConstellationDto $dto) {
                 $areaType = UniverseHelpers::determineAreaType($dto->id);
@@ -248,7 +264,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $solarsystemsLookup = [];
 
         $this->streamUpsert(
-            $solarsystemClass::query(),
+            $this->modelQuery($solarsystemClass),
             JSONL::lazy(Storage::path('sde/mapSolarSystems.jsonl'), SolarsystemDto::class),
             function (SolarsystemDto $solarsystem) use (&$solarsystemsLookup, $jove_observatories_flat) {
                 return $this->transformSolarsystem($solarsystem, $solarsystemsLookup, $jove_observatories_flat);
@@ -266,7 +282,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      *
      * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
      * @param  int[]  $jove_observatories_flat
-     * @return array{id: int, constellation_id: int, region_id: int, name: string, type: string, security: string, pos_x: float, pos_y: float, pos_z: float, has_jove_observatory: bool, created_at: Carbon, updated_at: Carbon}
+     * @return array{id: int, constellation_id: int, region_id: int, name: string, type: string, security: string, pos_x: float, pos_y: float, pos_z: float, has_jove_observatory: bool, created_at: CarbonInterface, updated_at: CarbonInterface}
      */
     private function transformSolarsystem(SolarsystemDto $dto, array &$solarsystemsLookup, array $jove_observatories_flat): array
     {
@@ -309,7 +325,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $celestialClass = ClassResolver::celestial();
 
         return $this->streamUpsert(
-            $celestialClass::query(),
+            $this->modelQuery($celestialClass),
             JSONL::lazy(Storage::path('sde/mapStars.jsonl'), StarDto::class),
             fn (StarDto $star) => $this->transformStar($star, $solarsystemsLookup),
             ['id'],
@@ -322,7 +338,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      * Transform star data for database insertion
      *
      * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
-     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: null, created_at: Carbon, updated_at: Carbon}|null
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: null, created_at: CarbonInterface, updated_at: CarbonInterface}|null
      */
     private function transformStar(StarDto $dto, array $solarsystemsLookup): ?array
     {
@@ -359,7 +375,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $planetsLookup = [];
 
         $this->streamUpsert(
-            $celestialClass::query(),
+            $this->modelQuery($celestialClass),
             JSONL::lazy(Storage::path('sde/mapPlanets.jsonl'), PlanetDto::class),
             function (PlanetDto $planet) use ($solarsystemsLookup, &$planetsLookup) {
                 return $this->transformPlanet($planet, $solarsystemsLookup, $planetsLookup);
@@ -377,7 +393,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      *
      * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
      * @param  array<int, array{celestialIndex: int}>  $planetsLookup
-     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: null, created_at: Carbon, updated_at: Carbon}|null
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: null, created_at: CarbonInterface, updated_at: CarbonInterface}|null
      */
     private function transformPlanet(PlanetDto $dto, array $solarsystemsLookup, array &$planetsLookup): ?array
     {
@@ -419,7 +435,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $moonsLookup = [];
 
         $this->streamUpsert(
-            $celestialClass::query(),
+            $this->modelQuery($celestialClass),
             JSONL::lazy(Storage::path('sde/mapMoons.jsonl'), MoonDto::class),
             function (MoonDto $moon) use ($solarsystemsLookup, $planetsLookup, &$moonsLookup) {
                 return $this->transformMoon($moon, $solarsystemsLookup, $planetsLookup, $moonsLookup);
@@ -438,7 +454,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
      * @param  array<int, array{celestialIndex: int}>  $planetsLookup
      * @param  array<int, array{orbitID: int, orbitIndex: int}>  $moonsLookup
-     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: int, created_at: Carbon, updated_at: Carbon}|null
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, group_id: int, parent_id: int, created_at: CarbonInterface, updated_at: CarbonInterface}|null
      */
     private function transformMoon(MoonDto $dto, array $solarsystemsLookup, array $planetsLookup, array &$moonsLookup): ?array
     {
@@ -483,7 +499,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $celestialClass = ClassResolver::celestial();
 
         return $this->streamUpsert(
-            $celestialClass::query(),
+            $this->modelQuery($celestialClass),
             JSONL::lazy(Storage::path('sde/mapAsteroidBelts.jsonl'), AsteroidBeltDto::class),
             fn (AsteroidBeltDto $belt) => $this->transformAsteroidBelt($belt, $solarsystemsLookup, $planetsLookup),
             ['id'],
@@ -497,7 +513,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      *
      * @param  array<int, array{constellationID: int, regionID: int, name: string}>  $solarsystemsLookup
      * @param  array<int, array{celestialIndex: int}>  $planetsLookup
-     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: null, group_id: int, parent_id: int, created_at: Carbon, updated_at: Carbon}|null
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: null, group_id: int, parent_id: int, created_at: CarbonInterface, updated_at: CarbonInterface}|null
      */
     private function transformAsteroidBelt(AsteroidBeltDto $dto, array $solarsystemsLookup, array $planetsLookup): ?array
     {
@@ -533,7 +549,7 @@ class SeedUniverseCommand extends BaseSeedCommand
     protected function seedServices(): int
     {
         return $this->streamUpsert(
-            Service::query(),
+            $this->modelQuery(Service::class),
             JSONL::lazy(Storage::path('sde/stationServices.jsonl'), StationServiceDto::class),
             fn (StationServiceDto $dto) => [
                 'id' => $dto->id,
@@ -557,7 +573,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         $operationServiceRecords = [];
 
         $operationCount = $this->streamUpsert(
-            StationOperation::query(),
+            $this->modelQuery(StationOperation::class),
             JSONL::lazy(Storage::path('sde/stationOperations.jsonl'), StationOperationDto::class),
             function (StationOperationDto $dto) use (&$operationServiceRecords) {
                 // Collect operation-service relationships
@@ -621,7 +637,7 @@ class SeedUniverseCommand extends BaseSeedCommand
         }
 
         return $this->streamUpsert(
-            $stationClass::query(),
+            $this->modelQuery($stationClass),
             JSONL::lazy(Storage::path('sde/npcStations.jsonl'), StationDto::class),
             fn (StationDto $station) => $this->transformStation($station, $solarsystemsLookup, $planetsLookup, $moonsLookup, $corporationNames, $operationNames),
             ['id'],
@@ -638,7 +654,7 @@ class SeedUniverseCommand extends BaseSeedCommand
      * @param  array<int, array{orbitID: int, orbitIndex: int}>  $moonsLookup
      * @param  Collection<int, string>  $corporationNames
      * @param  Collection<int, string>  $operationNames
-     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, parent_id: int|null, operation_id: int|null, owner_id: int, created_at: Carbon, updated_at: Carbon}|null
+     * @return array{id: int, solarsystem_id: int, constellation_id: int, region_id: int, name: string, type_id: int, parent_id: int|null, operation_id: int|null, owner_id: int, created_at: CarbonInterface, updated_at: CarbonInterface}|null
      */
     private function transformStation(
         StationDto $dto,

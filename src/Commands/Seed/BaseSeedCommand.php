@@ -8,6 +8,7 @@ use Exception;
 use Generator;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
@@ -17,6 +18,19 @@ use function Laravel\Prompts\progress;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\table;
 
+/**
+ * @phpstan-type CommandStats array{
+ *     command: string,
+ *     start_memory: int,
+ *     final_memory: int,
+ *     peak_memory: int,
+ *     delta_memory: int,
+ *     duration: float,
+ *     efficiency: string,
+ *     record_count: int|null,
+ *     timestamp: string,
+ * }
+ */
 abstract class BaseSeedCommand extends Command
 {
     const int PROGRESS_STEP = 100;
@@ -70,7 +84,7 @@ abstract class BaseSeedCommand extends Command
         $units = ['B', 'KB', 'MB', 'GB'];
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
+        $pow = (int) min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
 
         return round($bytes, 2).' '.$units[$pow];
@@ -133,11 +147,11 @@ abstract class BaseSeedCommand extends Command
     /**
      * Save command statistics to cache
      *
-     * @param  array<string, mixed>  $stats
+     * @param  CommandStats  $stats
      */
     protected function saveCommandStats(array $stats): void
     {
-        $allStats = Cache::get(self::CACHE_KEY, []);
+        $allStats = $this->getAllCommandStats();
         $allStats[$stats['command']] = $stats;
         Cache::put(self::CACHE_KEY, $allStats, self::CACHE_TTL);
     }
@@ -203,11 +217,18 @@ abstract class BaseSeedCommand extends Command
     /**
      * Get all cached command statistics
      *
-     * @return array<string, array<string, mixed>>
+     * @return array<string, CommandStats>
      */
     protected function getAllCommandStats(): array
     {
-        return Cache::get(self::CACHE_KEY, []);
+        $stats = Cache::get(self::CACHE_KEY, []);
+
+        if (! is_array($stats)) {
+            return [];
+        }
+
+        /** @var array<string, CommandStats> $stats */
+        return $stats;
     }
 
     /**
@@ -246,6 +267,9 @@ abstract class BaseSeedCommand extends Command
     /**
      * Perform chunked upsert to avoid database placeholder limits with built-in progress tracking
      *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      * @param  array<int,mixed>  $data
      * @param  array<int,string>  $uniqueColumns
      * @param  array<int,string>  $updateColumns
@@ -259,10 +283,10 @@ abstract class BaseSeedCommand extends Command
         $chunks = array_chunk($data, self::UPSERT_CHUNK_SIZE);
         $totalChunks = count($chunks);
         $totalItems = count($data);
-        $quiet = $this->isQuiet();
+        $showFeedback = $label !== null && ! $this->isQuiet();
 
         // Only show progress for larger datasets (more than 1 chunk) and not in quiet mode
-        if ($totalChunks > 1 && $label && ! $quiet) {
+        if ($showFeedback && $totalChunks > 1) {
             $progressBar = progress(label: $label, steps: $totalItems);
             $progressBar->start();
 
@@ -272,7 +296,7 @@ abstract class BaseSeedCommand extends Command
             }
 
             $progressBar->finish();
-        } elseif ($label && ! $quiet) {
+        } elseif ($showFeedback) {
             // Use spin for single chunk operations
             spin(
                 fn () => $query->upsert($data, $uniqueColumns, $updateColumns),
@@ -293,7 +317,9 @@ abstract class BaseSeedCommand extends Command
      * and buffering them for chunked database upserts. This keeps memory usage
      * constant regardless of the source data size.
      *
-     * @param  Builder  $query  The Eloquent query builder for the target model
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query  The Eloquent query builder for the target model
      * @param  Generator  $dataGenerator  Generator that yields items to process
      * @param  callable  $transformer  Callback to transform each item into a DB record.
      *                                 Should return an array or null to skip the item.
@@ -326,6 +352,9 @@ abstract class BaseSeedCommand extends Command
     /**
      * Process a stream of data and perform chunked upserts
      *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      * @param  array<int,string>  $uniqueColumns
      * @param  array<int,string>  $updateColumns
      */

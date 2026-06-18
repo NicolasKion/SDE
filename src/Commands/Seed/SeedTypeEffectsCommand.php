@@ -76,7 +76,7 @@ class SeedTypeEffectsCommand extends BaseSeedCommand
 
             // Flush buffer when chunk size is reached
             if (count($upsertData) >= self::UPSERT_CHUNK_SIZE) {
-                $typeEffect::upsert(
+                $typeEffect::query()->upsert(
                     $upsertData,
                     ['id'],
                     ['type_id', 'effect_id', 'is_default', 'updated_at']
@@ -88,7 +88,7 @@ class SeedTypeEffectsCommand extends BaseSeedCommand
 
         // Flush remaining effects
         if (! empty($upsertData)) {
-            $typeEffect::upsert(
+            $typeEffect::query()->upsert(
                 $upsertData,
                 ['id'],
                 ['type_id', 'effect_id', 'is_default', 'updated_at']
@@ -97,8 +97,8 @@ class SeedTypeEffectsCommand extends BaseSeedCommand
 
         // Delete type effects that are no longer in the SDE data
         if (! empty($validIds)) {
-            // Get all existing IDs from database
-            $existingIds = $typeEffect::query()->pluck('id')->toArray();
+            // Get all existing integer primary keys from the database
+            $existingIds = array_filter($typeEffect::query()->pluck('id')->all(), 'is_int');
 
             // Calculate which IDs should be deleted (exist in DB but not in SDE data)
             $idsToDelete = array_diff($existingIds, $validIds);

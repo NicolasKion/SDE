@@ -7,11 +7,11 @@ namespace NicolasKion\SDE\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Container\Attributes\Config;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
-use function assert;
 use function is_numeric;
 use function Laravel\Prompts\spin;
 
@@ -76,16 +76,14 @@ class DownloadSDECommand extends Command
     private function getLatestBuildNumber(): ?int
     {
         $response = Http::get(self::SDE_LATEST_URL);
-        if ($response->failed()) {
+        if (! $response instanceof Response || $response->failed()) {
             return null;
         }
 
         $build = $response->json('buildNumber');
-        if (! $build) {
+        if (! is_numeric($build)) {
             return null;
         }
-
-        assert(is_numeric($build));
 
         return (int) $build;
     }

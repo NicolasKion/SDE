@@ -21,7 +21,7 @@ final readonly class PlanetDto
     ) {}
 
     /**
-     * @param  array{_key: int, solarSystemID: int, celestialIndex: int, orbitID: int, moonIDs: array<int>, asteroidBeltIDs: array<int>, typeID: int}  $data
+     * @param  array{_key: int, solarSystemID: int, celestialIndex: int, orbitID: int, moonIDs?: array<int>, asteroidBeltIDs?: array<int>, typeID: int}  $data
      */
     public static function fromArray(array $data): self
     {
