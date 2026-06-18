@@ -18,16 +18,16 @@
     "require": {
         "php": "^8.3.0",
         "ext-zip": "*",
-        "illuminate/contracts": "^10||^11|^12",
-        "laravel/framework": "^11|^12",
-        "symfony/yaml": "^7.2"
+        "illuminate/contracts": "^12|^13",
+        "laravel/framework": "^12|^13",
+        "symfony/yaml": "^7.2|^8.0"
     },
     "require-dev": {
-        "laravel/pint": "^v1.22.0",
-        "pestphp/pest": "^v3.8.1",
+        "laravel/pint": "^1.22.0",
+        "pestphp/pest": "^4.0",
         "phpstan/phpstan": "^2.1.12",
         "rector/rector": "^2.0.11",
-        "symfony/var-dumper": "^6.4.0|^7.0.0"
+        "symfony/var-dumper": "^7.0.0|^8.0.0"
     },
     "autoload": {
         "psr-4": {
