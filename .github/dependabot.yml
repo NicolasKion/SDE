@@ -1,3 +1,4 @@
+# Weekly dependency updates; non-major bumps auto-merge once CI passes
 version: 2
 updates:
   - package-ecosystem: composer
