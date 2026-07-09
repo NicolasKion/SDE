@@ -1,6 +1,10 @@
 name: Formats
 
-on: ['push', 'pull_request']
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   ci:
@@ -45,5 +49,19 @@ jobs:
     - name: Coding Style Checks
       run: composer test:lint
 
+    - name: Refactoring Checks
+      run: composer test:refacto
+
     - name: Type Checks
       run: composer test:types
+
+  formats-ok:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: always()
+
+    name: Formats OK
+
+    steps:
+      - name: Check matrix result
+        run: test "${{ needs.ci.result }}" = "success"

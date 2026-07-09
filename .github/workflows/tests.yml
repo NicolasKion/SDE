@@ -1,6 +1,10 @@
 name: Tests
 
-on: ['push', 'pull_request']
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   ci:
@@ -43,3 +47,38 @@ jobs:
 
     - name: Integration Tests
       run: php ./vendor/bin/pest
+
+  nightly:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    name: Tests PHP nightly (non-blocking)
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: nightly
+        extensions: dom, libxml, mbstring, zip, fileinfo, iconv, openssl, simplexml, xml, xmlwriter, tokenizer, ctype, filter, phar, session
+        coverage: none
+
+    - name: Install Composer dependencies
+      run: composer update --no-interaction --prefer-dist --ignore-platform-req=php+
+
+    - name: Integration Tests
+      run: php ./vendor/bin/pest
+
+  tests-ok:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: always()
+
+    name: Tests OK
+
+    steps:
+      - name: Check matrix result
+        run: test "${{ needs.ci.result }}" = "success"
